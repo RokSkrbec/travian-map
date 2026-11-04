@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Travian rog.x2 – Ancient Europe region map</title>
+<style>
+  :root { --bg:#14171c; --panel:#1d2128; --line:#2b3039; --text:#e6e6e6; --muted:#9aa3ad; --accent:#f0c36a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif; display:flex; height:100vh; overflow:hidden; }
+  button { background:#2a303a; color:var(--text); border:1px solid #3a414d; border-radius:4px; padding:2px 8px; font-size:12px; cursor:pointer; font-family:inherit; }
+  button:disabled { opacity:.4; cursor:default; }
+  input[type=text], input[type=number] { padding:5px 8px; background:#111419; border:1px solid #333a45; color:var(--text); border-radius:4px; font:inherit; font-size:13px; width:100%; }
+  input[type=checkbox] { accent-color:var(--accent); cursor:pointer; margin:0; }
+
+  /* sidebar */
+  #side { width:330px; flex:none; background:var(--panel); display:flex; flex-direction:column; border-right:1px solid var(--line); }
+  #side h1 { font-size:16px; margin:14px 14px 4px; }
+  #side .sub { color:var(--muted); font-size:12px; margin:0 14px 8px; }
+  #sideScroll { flex:1; overflow:auto; border-top:1px solid var(--line); }
+  details.panel { border-bottom:1px solid var(--line); }
+  details.panel > summary { list-style:none; cursor:pointer; padding:9px 14px; font-weight:600; display:flex; align-items:center; gap:8px; user-select:none; }
+  details.panel > summary::-webkit-details-marker { display:none; }
+  details.panel > summary::before { content:'▸'; color:var(--muted); width:10px; transition:transform .15s; }
+  details.panel[open] > summary::before { transform:rotate(90deg); }
+  details.panel > summary:hover { background:#232831; }
+  details.panel > summary .badge { margin-left:auto; font-weight:400; font-size:12px; color:var(--accent); }
+  .body { padding:2px 14px 12px; font-size:12px; color:var(--muted); }
+  .body label { display:flex; align-items:center; gap:6px; margin:4px 0; }
+  .body .row { display:flex; flex-wrap:wrap; gap:2px 14px; }
+  .body .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
+  .body .sw { width:10px; height:10px; border-radius:50%; flex:none; }
+  .body input[type=number] { width:90px; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0; }
+  #list { max-height:300px; overflow:auto; margin:0 -6px; }
+  .item { display:flex; align-items:center; gap:8px; padding:3px 8px; border-radius:4px; cursor:pointer; color:var(--text); font-size:13px; }
+  .item:hover { background:#2a303a; }
+  .item.sel { background:#3a3424; }
+  .item .sw { width:12px; height:12px; border-radius:2px; }
+  .item .n { flex:1; }
+  .item .c { color:var(--muted); font-size:12px; }
+  #allyList { max-height:220px; overflow:auto; border:1px solid var(--line); border-radius:4px; margin:6px 0 4px; }
+  #allyList label { margin:0; padding:2px 6px; cursor:pointer; }
+  #allyList label:hover { background:#2a303a; }
+  #allyList label.on { background:#3a3424; }
+  #allyList .t { flex:1; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #allyList .sw { border-radius:2px; }
+  .seg { display:inline-flex; border:1px solid #3a414d; border-radius:4px; overflow:hidden; }
+  .seg label { margin:0 !important; padding:2px 10px; cursor:pointer; }
+  .seg input { display:none; }
+  .seg label:has(input:checked) { background:#3a414d; color:var(--text); }
+  #foot { padding:8px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+
+  /* map */
+  #main { flex:1; position:relative; overflow:hidden; cursor:grab; min-width:200px; }
+  #main.drag { cursor:grabbing; }
+  canvas { position:absolute; left:0; top:0; image-rendering:pixelated; }
+  #tip { position:absolute; pointer-events:none; background:rgba(0,0,0,.85); padding:4px 8px; border-radius:4px; font-size:12px; display:none; white-space:pre; line-height:1.45; z-index:2; }
+  #tip b { color:var(--accent); }
+  #help { position:absolute; right:10px; bottom:10px; color:var(--muted); font-size:12px; background:rgba(0,0,0,.5); padding:4px 8px; border-radius:4px; }
+  #resBtn { position:absolute; right:10px; top:10px; padding:5px 10px; font-size:13px; z-index:1; }
+
+  /* results panel */
+  #res { width:500px; flex:none; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; }
+  #res[hidden] { display:none; }
+  #res .head { padding:10px 12px 8px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:8px; }
+  #res .head .bar { margin:0; }
+  #res .title { font-weight:600; }
+  #res .note { color:var(--muted); font-size:12px; }
+  #resWrap { flex:1; overflow:auto; }
+  #resTable { width:100%; border-collapse:collapse; font-size:11.5px; }
+  #resTable th { position:sticky; top:0; background:#232831; text-align:left; padding:6px 5px; font-weight:600; cursor:pointer; white-space:nowrap; user-select:none; border-bottom:1px solid var(--line); }
+  #resTable th.num, #resTable td.num { text-align:right; }
+  #resTable th.on { color:var(--accent); }
+  #resTable td { padding:4px 5px; border-bottom:1px solid #22262e; white-space:nowrap; max-width:78px; overflow:hidden; text-overflow:ellipsis; }
+  #resTable tr:hover td { background:#2a303a; cursor:pointer; }
+  #resTable .sw { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+  #resMore { margin:10px; }
+  #copyBox textarea { width:100%; height:120px; background:#111419; color:var(--text); border:1px solid #333a45; border-radius:4px; font:11px ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>Ancient Europe regions</h1>
+  <div class="sub">rog.x2.europe.travian.com · official region outlines · villages from map.sql downloaded __DATE__ · <span id="cnt"></span></div>
+  <div id="sideScroll">
+    <details class="panel" data-k="regions" open>
+      <summary>Regions <span class="badge" id="regBadge"></span></summary>
+      <div class="body">
+        <input type="text" id="q" placeholder="Filter regions… or go to x|y">
+        <div class="bar"><span id="selcount">No regions highlighted</span><button id="clearSel" disabled>Clear</button></div>
+        <div id="list"></div>
+      </div>
+    </details>
+    <details class="panel" data-k="display">
+      <summary>Map display</summary>
+      <div class="body">
+        <label><input type="checkbox" id="optLabels" checked> Region names</label>
+        <label><input type="checkbox" id="optBorders" checked> Borders</label>
+        <label><input type="checkbox" id="optGrid" checked> Grid every 50</label>
+        <label><input type="checkbox" id="optVillages" checked> Show villages</label>
+        <label><input type="checkbox" id="optMute" checked> Mute region colours under villages</label>
+        <label>Colour villages by
+          <span class="seg"><label><input type="radio" name="colorBy" value="tribe" checked>Tribe</label><label><input type="radio" name="colorBy" value="ally">Alliance</label></span></label>
+      </div>
+    </details>
+    <details class="panel" data-k="type" open>
+      <summary>Village type &amp; tribe <span class="badge" id="typeBadge"></span></summary>
+      <div class="body">
+        <div class="row">
+          <label><input type="checkbox" class="vf" id="stNormal" checked> ● Village</label>
+          <label><input type="checkbox" class="vf" id="stCapital" checked> ◉ Capital</label>
+          <label><input type="checkbox" class="vf" id="stCity" checked> ■ City</label>
+        </div>
+        <div class="grid2" id="tribeF"></div>
+      </div>
+    </details>
+    <details class="panel" data-k="filters" open>
+      <summary>Player &amp; village filters <span class="badge" id="filtBadge"></span></summary>
+      <div class="body">
+        <label><input type="text" class="vf" id="who" placeholder="Player name…"></label>
+        <label>Min. population <input type="number" class="vf" id="minPop" value="0" min="0" step="50"></label>
+        <label><input type="checkbox" class="vf" id="optVP"> Only villages with victory points</label>
+        <label><input type="checkbox" class="vf" id="optInSel"> Only in highlighted regions</label>
+      </div>
+    </details>
+    <details class="panel" data-k="ally">
+      <summary>Alliances <span class="badge" id="allySel"></span></summary>
+      <div class="body">
+        <div class="bar"><input type="text" id="allyQ" placeholder="Find alliance…"><button id="allyClear" disabled>Clear</button></div>
+        <div id="allyList"></div>
+        <div>Tick alliances to show only their villages. Sorted by villages · population.</div>
+      </div>
+    </details>
+  </div>
+  <div id="foot"><span id="vcount"></span><button id="resetAll">Reset filters</button></div>
+</div>
+<div id="main">
+  <canvas id="cv"></canvas>
+  <div id="tip"></div>
+  <button id="resBtn">☰ Players &amp; villages</button>
+  <div id="help">Scroll to zoom · drag to pan · click a region to highlight it · hover a village for details · gold ring = victory points (zoomed in)</div>
+</div>
+<div id="res" hidden>
+  <div class="head">
+    <div class="bar"><span class="title">Matching filters</span><button id="resClose" title="Close">✕</button></div>
+    <div class="bar">
+      <span class="seg"><label><input type="radio" name="resTab" value="players" checked>Players</label><label><input type="radio" name="resTab" value="villages">Villages</label></span>
+      <button id="resCopy" title="Copy this list as tab-separated text (pastes into spreadsheets)">Copy list</button>
+    </div>
+    <input type="text" id="resQ" placeholder="Search this list…">
+    <div class="note" id="resNote"></div>
+    <div id="copyBox" hidden><div class="bar"><span class="note">Your browser blocked copying. Press Ctrl/⌘+C to copy the selected text.</span><button onclick="this.closest('#copyBox').hidden=true">Done</button></div><textarea readonly></textarea></div>
+  </div>
+  <div id="resWrap"><table id="resTable"><thead></thead><tbody></tbody></table><button id="resMore" hidden></button></div>
+</div>
+<script>
+const DATA = __DATA__;
+const N = 401, MIN = -200, S = N / 185;
+const REG = DATA.regions, names = REG.map(r => r.n), NR = names.length;
+const nameIdx = Object.fromEntries(names.map((n, i) => [n, i]));
+// village row: [x, y, regionIdx, tribe, villageName, player, alliance, population, flags(1=capital,2=city,4=harbor), victoryPoints]
+const V = DATA.v.map(a => [a[0], a[1], nameIdx[a[2]] ?? -1, ...a.slice(3)]);
+const TRIBES = {1:['Romans','#e5534b'],2:['Teutons','#4f8fe6'],3:['Gauls','#3fcf6e'],5:['Natars','#a0a0a0'],6:['Egyptians','#f0cf3a'],7:['Huns','#b56cf0'],8:['Spartans','#f58b35']};
+const vAt = new Map(); for (const v of V) vAt.set((200-v[1])*N + (v[0]-MIN), v);
+
+
+// ---------- colours ----------
+const colors = names.map((_, i) => {
+  const h = (i * 137.508) % 360, s = 45 + (i % 3) * 12, l = 42 + ((i * 7) % 4) * 6;
+  return `hsl(${h.toFixed(1)},${s}%,${l}%)`;
+});
+function hslToRgb(str){ const c=document.createElement('canvas').getContext('2d'); c.fillStyle=str; const h=c.fillStyle; return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+const rgb = colors.map(hslToRgb);
+const counts = new Array(NR).fill(0);
+for (const [, , r] of V) if (r >= 0) counts[r]++;
+
+// ---------- rasterise the official region outlines onto the 401x401 tile grid ----------
+const grid = new Int16Array(N*N).fill(-1);   // index = row*N+col, row 0 = y 200 (north)
+{
+  const oc = document.createElement('canvas'); oc.width = N; oc.height = N;
+  const octx = oc.getContext('2d', { willReadFrequently: true });
+  REG.forEach((reg, r) => {
+    octx.setTransform(1,0,0,1,0,0); octx.clearRect(0,0,N,N);
+    octx.setTransform(S,0,0,S,0,0); octx.fillStyle = '#000';
+    for (const d of reg.d) octx.fill(new Path2D(d), 'evenodd');
+    const px = octx.getImageData(0,0,N,N).data;
+    for (let i = 0; i < N*N; i++) if (px[i*4+3] >= 128) grid[i] = r;
+  });
+}
+// close hairline gaps between neighbouring outlines (does not grow into open sea)
+for (let pass = 0; pass < 2; pass++) {
+  const g2 = grid.slice();
+  for (let row=1; row<N-1; row++) for (let col=1; col<N-1; col++) {
+    const i=row*N+col; if (grid[i]>=0) continue;
+    const c={}; let best=-1, bc=0;
+    for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) { const r=grid[i+dy*N+dx]; if(r<0) continue; c[r]=(c[r]||0)+1; if(c[r]>bc){bc=c[r];best=r;} }
+    if (bc >= 5) g2[i] = best;
+  }
+  grid.set(g2);
+}
+// check against the server's own village list, then let villages override (they are ground truth)
+let agree = 0, nVil = 0;
+for (const [x,y,r] of V) {
+  if (r<0) continue; const i=(200-y)*N+(x-MIN); nVil++;
+  if (grid[i]===r) { agree++; continue; }
+  // The outline is a smoothed drawing, so a few villages sit 1-3 tiles outside their region.
+  // Repaint the shortest tile path from the village back to its region, so the correction joins
+  // the region instead of leaving a lone coloured tile that looks like a village dot.
+  const prev=new Map([[i,-1]]); let q=[i], found=-1;
+  for (let d=0; d<6 && found<0 && q.length; d++) {
+    const nq=[];
+    for (const j of q) { const row=(j/N)|0, col=j%N;
+      for (const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]) { const rr=row+dr, cc=col+dc;
+        if (rr<0||cc<0||rr>=N||cc>=N) continue; const k=rr*N+cc; if (prev.has(k)) continue;
+        prev.set(k,j); if (grid[k]===r) { found=k; break; } nq.push(k); }
+      if (found>=0) break; }
+    q=nq;
+  }
+  if (found<0) continue;   // far from its outline (rare): leave the map alone; the tooltip still shows the village's own region
+  for (let j=prev.get(found); j!==-1; j=prev.get(j)) grid[j]=r;
+}
+// Merge tiny leftover slivers (no village on them) into the region around them, so the map has no
+// stray single-tile specks that could be mistaken for village markers.
+{
+  const hasV=new Uint8Array(N*N); for (const [x,y] of V) hasV[(200-y)*N+(x-MIN)]=1;
+  const seen=new Uint8Array(N*N), D4=[[1,0],[-1,0],[0,1],[0,-1]];
+  for (let i=0;i<N*N;i++){
+    if (seen[i]||grid[i]<0) continue;
+    const r=grid[i], comp=[i], st=[i]; seen[i]=1; let vil=false;
+    while (st.length){ const j=st.pop(); if (hasV[j]) vil=true; const row=(j/N)|0, col=j%N;
+      for (const [dr,dc] of D4){ const rr=row+dr, cc=col+dc; if(rr<0||cc<0||rr>=N||cc>=N) continue; const k=rr*N+cc;
+        if (!seen[k]&&grid[k]===r){ seen[k]=1; st.push(k); comp.push(k); } } }
+    if (comp.length>3 || vil) continue;
+    const c={}; let best=-1, bc=0;
+    for (const j of comp){ const row=(j/N)|0, col=j%N;
+      for (const [dr,dc] of D4){ const rr=row+dr, cc=col+dc; if(rr<0||cc<0||rr>=N||cc>=N) continue; const n=grid[rr*N+cc];
+        if (n<0||n===r) continue; c[n]=(c[n]||0)+1; if (c[n]>bc){ bc=c[n]; best=n; } } }
+    if (best>=0) for (const j of comp) grid[j]=best;
+  }
+}
+const ACCURACY = { agree, checked: nVil };
+
+// ---------- label anchor: interior tile (max distance to border) per region ----------
+const dist = new Int16Array(N*N);
+{
+  const q = [];
+  for (let row=0; row<N; row++) for (let col=0; col<N; col++) {
+    const i=row*N+col, r=grid[i]; if (r<0) continue;
+    let edge = row==0||col==0||row==N-1||col==N-1;
+    if (!edge) edge = grid[i-1]!==r||grid[i+1]!==r||grid[i-N]!==r||grid[i+N]!==r;
+    if (edge) { dist[i]=1; q.push(i); } else dist[i]=0;
+  }
+  for (let h=0; h<q.length; h++) { const i=q[h], r=grid[i];
+    for (const j of [i-1,i+1,i-N,i+N]) if (j>=0&&j<N*N&&grid[j]===r&&dist[j]===0) { dist[j]=dist[i]+1; q.push(j); } }
+}
+const anchor = new Array(NR).fill(null), area = new Array(NR).fill(0);
+for (let i=0;i<N*N;i++){ const r=grid[i]; if(r<0) continue; area[r]++; if(!anchor[r]||dist[i]>anchor[r].d) anchor[r]={d:dist[i],row:Math.floor(i/N),col:i%N}; }
+
+// ---------- base image ----------
+const base = document.createElement('canvas'); base.width=N; base.height=N;
+function paintBase(){
+  const bctx=base.getContext('2d'), img=bctx.createImageData(N,N);
+  for (let i=0;i<N*N;i++){ const r=grid[i], o=i*4;
+    if (r<0){ img.data[o]=28; img.data[o+1]=46; img.data[o+2]=66; img.data[o+3]=255; continue; }
+    let [a,b,c]=rgb[r];
+    if (opt('optVillages') && opt('optMute') && !(checked.size && checked.has(r))){ a=a*.55+25; b=b*.55+28; c=c*.55+32; }
+    if (checked.size && !checked.has(r)){ a=a*.35+20; b=b*.35+20; c=c*.35+20; }
+    img.data[o]=a; img.data[o+1]=b; img.data[o+2]=c; img.data[o+3]=255; }
+  bctx.putImageData(img,0,0);
+}
+const STORE='travian-rog-x2-highlighted';
+const checked=new Set((()=>{ try{ return JSON.parse(localStorage.getItem(STORE)||'[]').map(n=>nameIdx[n]).filter(r=>r!=null); }catch(e){ return []; } })());
+
+// ---------- view ----------
+const main=document.getElementById('main'), cv=document.getElementById('cv'), ctx=cv.getContext('2d'), tip=document.getElementById('tip');
+let scale=2, ox=0, oy=0; const dpr=window.devicePixelRatio||1;
+const opt = id => document.getElementById(id).checked;
+function fit(){ const w=main.clientWidth,h=main.clientHeight; scale=Math.min(w,h)/N*0.97; ox=(w-N*scale)/2; oy=(h-N*scale)/2; }
+function draw(){
+  const w=main.clientWidth,h=main.clientHeight; cv.width=w*dpr; cv.height=h*dpr; cv.style.width=w+'px'; cv.style.height=h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#14171c'; ctx.fillRect(0,0,w,h);
+  ctx.imageSmoothingEnabled=false; ctx.drawImage(base,ox,oy,N*scale,N*scale);
+  const c0=Math.max(0,Math.floor(-ox/scale)), c1=Math.min(N-1,Math.ceil((w-ox)/scale));
+  const r0=Math.max(0,Math.floor(-oy/scale)), r1=Math.min(N-1,Math.ceil((h-oy)/scale));
+  if (opt('optBorders')) {
+    ctx.strokeStyle='rgba(0,0,0,.75)'; ctx.lineWidth=Math.max(1,scale/6); ctx.beginPath();
+    for (let row=r0;row<=r1;row++) for (let col=c0;col<=c1;col++){ const r=grid[row*N+col];
+      if (col<N-1 && grid[row*N+col+1]!==r){ const X=ox+(col+1)*scale; ctx.moveTo(X,oy+row*scale); ctx.lineTo(X,oy+(row+1)*scale); }
+      if (row<N-1 && grid[(row+1)*N+col]!==r){ const Y=oy+(row+1)*scale; ctx.moveTo(ox+col*scale,Y); ctx.lineTo(ox+(col+1)*scale,Y); } }
+    ctx.stroke();
+  }
+  if (opt('optGrid')) {
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1; ctx.beginPath(); ctx.font='11px system-ui'; ctx.fillStyle='rgba(255,255,255,.45)';
+    for (let v=-200; v<=200; v+=50){ const X=ox+(v-MIN+.5)*scale, Y=oy+(200-v+.5)*scale;
+      ctx.moveTo(X,oy); ctx.lineTo(X,oy+N*scale); ctx.moveTo(ox,Y); ctx.lineTo(ox+N*scale,Y);
+      ctx.fillText(v,X+3,Math.max(12,oy+12)); ctx.fillText(v,Math.max(3,ox+3),Y-3); }
+    ctx.stroke();
+  }
+  if (opt('optVillages')) drawVillages(c0,c1,r0,r1);
+  drawFocus();
+  if (opt('optLabels')) {
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for (let r=0;r<NR;r++){ const a=anchor[r]; if(!a) continue;
+      const fs=Math.max(9,Math.min(22, scale*Math.sqrt(area[r])/5.5));
+      ctx.font=`600 ${fs}px system-ui`; const X=ox+(a.col+.5)*scale, Y=oy+(a.row+.5)*scale;
+      ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,.8)'; ctx.strokeText(names[r],X,Y);
+      ctx.fillStyle= checked.has(r) ? '#f0c36a' : (checked.size ? 'rgba(255,255,255,.6)' : '#fff'); ctx.fillText(names[r],X,Y); }
+  }
+  afterDraw();
+}
+// ---------- villages ----------
+const tribeOn = new Set(Object.keys(TRIBES).map(Number));
+function vStatus(v){ return v[8]&2 ? 'city' : v[8]&1 ? 'capital' : 'normal'; }
+function vVisible(v){
+  const st=vStatus(v);
+  if (st==='normal' && !opt('stNormal')) return false;
+  if (st==='capital' && !opt('stCapital')) return false;
+  if (st==='city' && !opt('stCity')) return false;
+  if (!tribeOn.has(v[3])) return false;
+  if (opt('optVP') && !(v[9]>0)) return false;
+  if (opt('optInSel') && checked.size && !checked.has(v[2])) return false;
+  if (v[7] < (+document.getElementById('minPop').value||0)) return false;
+  const w=document.getElementById('who').value.trim().toLowerCase();
+  if (w && !v[5].toLowerCase().includes(w)) return false;
+  if (allyOn.size && !allyOn.has(v[6])) return false;
+  return true;
+}
+function drawVillages(c0,c1,r0,r1){
+  const b=Math.max(2, scale*0.55), close=scale>=3, layers={normal:[],capital:[],city:[]};
+  for (const v of visible()){ const col=v[0]-MIN, row=200-v[1]; if(col<c0||col>c1||row<r0||row>r1) continue; layers[vStatus(v)].push(v); }
+  ctx.lineWidth=1; ctx.strokeStyle='rgba(0,0,0,.85)';
+  for (const st of ['normal','capital','city']) for (const v of layers[st]){
+    const X=ox+(v[0]-MIN+.5)*scale, Y=oy+(200-v[1]+.5)*scale; ctx.fillStyle=vColor(v);
+    ctx.beginPath();
+    if (st==='city'){ const s=b*1.8; ctx.rect(X-s/2,Y-s/2,s,s); }
+    else ctx.arc(X,Y, st==='capital'? (close? b*.9 : b*.75) : b*.55, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    if (st==='capital' && close){ ctx.beginPath(); ctx.arc(X,Y,b*.9+1.6,0,Math.PI*2); ctx.strokeStyle='#fff'; ctx.stroke(); ctx.strokeStyle='rgba(0,0,0,.85)'; }
+    if (v[9]>0 && scale>=4){ ctx.beginPath(); ctx.arc(X,Y,b*1.25+2,0,Math.PI*2); ctx.strokeStyle='#f0c36a'; ctx.lineWidth=1.5; ctx.stroke(); ctx.lineWidth=1; ctx.strokeStyle='rgba(0,0,0,.85)'; }
+  }
+}
+// filtered village list, recomputed only when a filter actually changes
+let visSig=null, visCache=[];
+function filterSig(){
+  return [opt('stNormal'),opt('stCapital'),opt('stCity'),[...tribeOn].sort().join(','),opt('optVP'),opt('optInSel'),
+    opt('optInSel')?[...checked].sort().join(','):'', document.getElementById('minPop').value, document.getElementById('who').value.trim().toLowerCase(),
+    [...allyOn].sort().join('|')].join(';');
+}
+function visible(){ const s=filterSig(); if (s!==visSig){ visSig=s; visCache=V.filter(vVisible); } return visCache; }
+
+// villages picked from the list get a ring on the map
+let focus=[];
+function drawFocus(){
+  if (!focus.length) return;
+  const b=Math.max(2, scale*0.55);
+  ctx.lineWidth=2.5; ctx.strokeStyle='#f0c36a';
+  for (const v of focus){ const X=ox+(v[0]-MIN+.5)*scale, Y=oy+(200-v[1]+.5)*scale;
+    ctx.beginPath(); ctx.arc(X,Y,b*1.6+5,0,Math.PI*2); ctx.stroke(); }
+  ctx.lineWidth=1;
+}
+
+function afterDraw(){
+  const vis=visible();
+  document.getElementById('vcount').textContent=`Showing ${vis.length} of ${V.length} villages`;
+  const tribesOff=Object.keys(TRIBES).length-tribeOn.size, stOff=['stNormal','stCapital','stCity'].filter(id=>!opt(id)).length;
+  document.getElementById('typeBadge').textContent = tribesOff||stOff ? 'filtered' : '';
+  const nf=[document.getElementById('who').value.trim(), +document.getElementById('minPop').value>0, opt('optVP'), opt('optInSel')&&checked.size].filter(Boolean).length;
+  document.getElementById('filtBadge').textContent = nf ? `${nf} active` : '';
+  document.getElementById('regBadge').textContent = checked.size ? `${checked.size} highlighted` : '';
+  if (!document.getElementById('res').hidden && resSig!==visSig) renderResults();
+}
+
+// ---------- players & villages list ----------
+const TYPE_NAME={normal:'Village',capital:'Capital',city:'City'};
+const RES_COLS={
+  players:[
+    {k:'name',  h:'Player',   get:p=>p.name},
+    {k:'ally',  h:'Alliance', get:p=>p.ally},
+    {k:'tribe', h:'Tribe',    get:p=>p.tribe},
+    {k:'n',     h:'Vill.',    get:p=>p.n,   num:1},
+    {k:'pop',   h:'Pop.',     get:p=>p.pop, num:1},
+    {k:'vp',    h:'VP',       get:p=>p.vp,  num:1}],
+  villages:[
+    {k:'name',  h:'Village',  get:v=>v[4]},
+    {k:'xy',    h:'x|y',      get:v=>`${v[0]}|${v[1]}`, sort:v=>v[0]*1000+v[1]},
+    {k:'player',h:'Player',   get:v=>v[5]},
+    {k:'ally',  h:'Alliance', get:v=>v[6]},
+    {k:'region',h:'Region',   get:v=>v[2]>=0?names[v[2]]:''},
+    {k:'type',  h:'Type',     get:v=>TYPE_NAME[vStatus(v)]},
+    {k:'pop',   h:'Pop.',     get:v=>v[7], num:1},
+    {k:'vp',    h:'VP',       get:v=>v[9], num:1}],
+};
+const resSort={players:{k:'pop',dir:-1}, villages:{k:'pop',dir:-1}};
+let resSig=null, resLimit=300, resRows=[];
+const resTab=()=>document.querySelector('input[name=resTab]:checked').value;
+function playersOf(vis){
+  const m=new Map();
+  for (const v of vis){ let p=m.get(v[5]); if(!p){ p={name:v[5],ally:v[6],tribes:new Set(),n:0,pop:0,vp:0,vs:[]}; m.set(v[5],p); }
+    p.tribes.add(v[3]); p.n++; p.pop+=v[7]; p.vp+=v[9]; p.vs.push(v); }
+  for (const p of m.values()) p.tribe=[...p.tribes].map(t=>(TRIBES[t]||['?'])[0]).join(', ');
+  return [...m.values()];
+}
+function renderResults(){
+  resSig=visSig;
+  const tab=resTab(), cols=RES_COLS[tab], so=resSort[tab], vis=visible();
+  let rows = tab==='players' ? playersOf(vis) : vis.slice();
+  const q=document.getElementById('resQ').value.trim().toLowerCase();
+  if (q) rows=rows.filter(r=> tab==='players' ? (r.name+' '+r.ally).toLowerCase().includes(q)
+    : (r[4]+' '+r[5]+' '+r[6]+' '+`${r[0]}|${r[1]}`).toLowerCase().includes(q));
+  const col=cols.find(c=>c.k===so.k)||cols[0], key=col.sort||col.get;
+  rows.sort((a,b)=>{ const x=key(a), y=key(b); return (typeof x==='number' ? x-y : String(x).localeCompare(String(y)))*so.dir; });
+  resRows=rows;
+  const players = tab==='players' ? rows.length : new Set(rows.map(v=>v[5])).size;
+  document.getElementById('resNote').textContent = tab==='players'
+    ? `${rows.length} players · ${rows.reduce((s,p)=>s+p.n,0)} villages · ${rows.reduce((s,p)=>s+p.pop,0)} population. Click a player to show their villages on the map.`
+    : `${rows.length} villages of ${players} players. Click a village to jump to it.`;
+  document.querySelector('#resTable thead').innerHTML='<tr>'+cols.map(c=>`<th data-k="${c.k}" class="${c.num?'num':''}${c.k===so.k?' on':''}">${c.h}${c.k===so.k?(so.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>';
+  const shown=rows.slice(0,resLimit);
+  document.querySelector('#resTable tbody').innerHTML=shown.map((r,i)=>'<tr data-i="'+i+'">'+cols.map(c=>{
+    let val=c.get(r);
+    if (c.k==='name' && tab==='villages') val=`<span class="sw" style="background:${vColor(r)}"></span>${esc(val)}`;
+    else if (c.k==='tribe' && tab==='players') val=[...r.tribes].map(t=>`<span class="sw" style="background:${(TRIBES[t]||['','#fff'])[1]}"></span>`).join('')+esc(val);
+    else val=esc(val);
+    return `<td class="${c.num?'num':''}" title="${typeof c.get(r)==='string'?esc(c.get(r)):''}">${val}</td>`; }).join('')+'</tr>').join('');
+  const more=document.getElementById('resMore');
+  more.hidden = rows.length<=resLimit; more.textContent=`Show all ${rows.length}`;
+}
+document.querySelector('#resTable thead').addEventListener('click',e=>{
+  const th=e.target.closest('th'); if(!th) return; const so=resSort[resTab()];
+  if (so.k===th.dataset.k) so.dir*=-1; else { so.k=th.dataset.k; so.dir = RES_COLS[resTab()].find(c=>c.k===so.k).num ? -1 : 1; }
+  renderResults();
+});
+document.querySelector('#resTable tbody').addEventListener('click',e=>{
+  const tr=e.target.closest('tr'); if(!tr) return; const r=resRows[+tr.dataset.i];
+  if (resTab()==='villages'){ focus=[r]; scale=Math.max(scale,8); ox=main.clientWidth/2-(r[0]-MIN+.5)*scale; oy=main.clientHeight/2-(200-r[1]+.5)*scale; draw(); return; }
+  focus=r.vs; let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  for (const v of r.vs){ x0=Math.min(x0,v[0]); x1=Math.max(x1,v[0]); y0=Math.min(y0,v[1]); y1=Math.max(y1,v[1]); }
+  const w=main.clientWidth, h=main.clientHeight;
+  scale=Math.max(1, Math.min(14, Math.min(w/(x1-x0+16), h/(y1-y0+16))));
+  ox=w/2-((x0+x1)/2-MIN+.5)*scale; oy=h/2-(200-(y0+y1)/2+.5)*scale; draw();
+});
+document.getElementById('resMore').onclick=()=>{ resLimit=1e9; renderResults(); };
+document.querySelectorAll('input[name=resTab]').forEach(r=>r.addEventListener('change',()=>{ resLimit=300; renderResults(); }));
+document.getElementById('resQ').addEventListener('input',()=>renderResults());
+function setResOpen(open){
+  const cx=(main.clientWidth/2-ox)/scale;              // keep the same map point centred
+  document.getElementById('res').hidden=!open; document.getElementById('resBtn').hidden=open;
+  ox=main.clientWidth/2-cx*scale;
+  try{ localStorage.setItem('travian-rog-x2-list', open?'1':''); }catch(e){}
+  resSig=null; draw();
+}
+document.getElementById('resBtn').onclick=()=>setResOpen(true);
+document.getElementById('resClose').onclick=()=>{ focus=[]; setResOpen(false); };
+document.getElementById('resCopy').onclick=async e=>{
+  const tab=resTab(), cols=RES_COLS[tab];
+  const tsv=[cols.map(c=>c.h).join('\t'), ...resRows.map(r=>cols.map(c=>String(c.get(r)).replace(/[\t\n]/g,' ')).join('\t'))].join('\n');
+  const btn=e.currentTarget, old=btn.textContent;
+  try { await navigator.clipboard.writeText(tsv); btn.textContent=`Copied ${resRows.length} rows`; }
+  catch(err){ const ta=document.createElement('textarea'); ta.value=tsv; document.body.appendChild(ta); ta.select();
+    let ok=false; try{ ok=document.execCommand('copy'); }catch(_){} ta.remove();
+    if (ok) btn.textContent=`Copied ${resRows.length} rows`;
+    else { const box=document.getElementById('copyBox'); box.hidden=false; const a=box.querySelector('textarea'); a.value=tsv; a.focus(); a.select(); return; } }
+  setTimeout(()=>btn.textContent=old, 1800);
+};
+
+// expansion panels remember whether they're open
+{
+  const KEY='travian-rog-x2-panels'; let st={}; try{ st=JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){}
+  document.querySelectorAll('details.panel').forEach(d=>{
+    if (d.dataset.k in st) d.open=st[d.dataset.k];
+    d.addEventListener('toggle',()=>{ st[d.dataset.k]=d.open; try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} });
+  });
+}
+// reset every village filter (region highlights stay)
+document.getElementById('resetAll').onclick=()=>{
+  for (const id of ['stNormal','stCapital','stCity']) document.getElementById(id).checked=true;
+  for (const id of ['optVP','optInSel']) document.getElementById(id).checked=false;
+  document.getElementById('minPop').value=0; document.getElementById('who').value='';
+  Object.keys(TRIBES).forEach(id=>tribeOn.add(+id)); document.querySelectorAll('#tribeF input').forEach(i=>i.checked=true);
+  allyOn.clear(); focus=[]; allyChanged();
+};
+{
+  const tf=document.getElementById('tribeF'), tc={}; for (const v of V) tc[v[3]]=(tc[v[3]]||0)+1;
+  for (const [id,[nm,col]] of Object.entries(TRIBES)){
+    const l=document.createElement('label'); l.innerHTML=`<input type="checkbox" checked><span class="sw" style="background:${col}"></span>${nm} <span style="opacity:.6">${tc[id]||0}</span>`;
+    l.querySelector('input').onchange=e=>{ e.target.checked?tribeOn.add(+id):tribeOn.delete(+id); draw(); };
+    tf.appendChild(l);
+  }
+  document.querySelectorAll('.vf').forEach(el=>el.addEventListener('input',draw));
+}
+// ---------- alliances ----------
+const ALLY_STORE='travian-rog-x2-alliances';
+const PAL=['#ff4d4d','#4dd2ff','#ffd24d','#7dff4d','#ff4dd2','#b54dff','#ff9a4d','#4dffb8','#ffffff','#4d7dff','#c8ff4d','#ff8fb3','#8fe3ff','#e0b0ff','#ffe08f','#9aff9a'];
+const allies = (()=>{ const m=new Map(); for (const v of V){ const k=v[6]; const a=m.get(k)||{tag:k,n:0,pop:0,players:new Set()}; a.n++; a.pop+=v[7]; a.players.add(v[5]); m.set(k,a); }
+  return [...m.values()].sort((a,b)=>b.n-a.n||b.pop-a.pop); })();
+const allyRank = new Map(allies.map((a,i)=>[a.tag,i]));
+const allyOn = new Set((()=>{ try{ return JSON.parse(localStorage.getItem(ALLY_STORE)||'[]').filter(t=>allyRank.has(t)); }catch(e){ return []; } })());
+function allyColor(tag){
+  if (allyOn.size){ const i=[...allyOn].indexOf(tag); return i<0 ? '#6b7280' : PAL[i%PAL.length]; }
+  const r=allyRank.get(tag); return tag && r<PAL.length ? PAL[r] : '#6b7280';
+}
+function vColor(v){ return document.querySelector('input[name=colorBy]:checked').value==='ally' ? allyColor(v[6]) : (TRIBES[v[3]]||['','#fff'])[1]; }
+function renderAllies(){
+  const q=document.getElementById('allyQ').value.trim().toLowerCase(), el=document.getElementById('allyList'); el.innerHTML='';
+  const byAlly=document.querySelector('input[name=colorBy]:checked').value==='ally';
+  for (const a of allies){
+    if (q && !a.tag.toLowerCase().includes(q)) continue;
+    const l=document.createElement('label'); if (allyOn.has(a.tag)) l.className='on';
+    l.title=`${a.players.size} players · ${a.n} villages · ${a.pop} population`;
+    l.innerHTML=`<input type="checkbox"${allyOn.has(a.tag)?' checked':''}>${byAlly?`<span class="sw" style="background:${allyColor(a.tag)}"></span>`:''}<span class="t">${a.tag?esc(a.tag):'<i>(no alliance)</i>'}</span><span>${a.n} · ${a.pop}</span>`;
+    l.querySelector('input').onchange=e=>{ e.target.checked?allyOn.add(a.tag):allyOn.delete(a.tag); allyChanged(); };
+    el.appendChild(l);
+  }
+}
+function allyChanged(){
+  try{ localStorage.setItem(ALLY_STORE, JSON.stringify([...allyOn])); }catch(e){}
+  document.getElementById('allySel').textContent = allyOn.size ? `${allyOn.size} selected` : '';
+  document.getElementById('allyClear').disabled = !allyOn.size;
+  renderAllies(); draw();
+}
+document.getElementById('allyQ').addEventListener('input',renderAllies);
+document.getElementById('allyClear').onclick=()=>{ allyOn.clear(); allyChanged(); };
+document.querySelectorAll('input[name=colorBy]').forEach(r=>r.addEventListener('change',()=>{ renderAllies(); draw(); }));
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function tileAt(px,py){ const col=Math.floor((px-ox)/scale), row=Math.floor((py-oy)/scale); if(col<0||row<0||col>=N||row>=N) return null; return {col,row,x:col+MIN,y:200-row,r:grid[row*N+col]}; }
+
+// pan / zoom
+let drag=null, moved=false;
+main.addEventListener('wheel',e=>{ e.preventDefault(); const f=Math.exp(-e.deltaY*0.0015), ns=Math.min(40,Math.max(0.8,scale*f)), rect=main.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  ox=mx-(mx-ox)*ns/scale; oy=my-(my-oy)*ns/scale; scale=ns; draw(); },{passive:false});
+main.addEventListener('mousedown',e=>{ drag={x:e.clientX,y:e.clientY,ox,oy}; moved=false; main.classList.add('drag'); });
+window.addEventListener('mouseup',e=>{ if(drag&&!moved){ const rect=main.getBoundingClientRect(); const t=tileAt(e.clientX-rect.left,e.clientY-rect.top); if(t&&e.target===cv) { if(t.r>=0) toggle(t.r); } } drag=null; main.classList.remove('drag'); });
+window.addEventListener('mousemove',e=>{
+  if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>3) moved=true; ox=drag.ox+dx; oy=drag.oy+dy; draw(); }
+  const rect=main.getBoundingClientRect(), t=tileAt(e.clientX-rect.left,e.clientY-rect.top);
+  if(!t||e.target!==cv){ tip.style.display='none'; return; }
+  tip.style.display='block';
+  const v=vAt.get(t.row*N+t.col), rr = v && v[2]>=0 ? v[2] : t.r;
+  let html=`(${t.x}|${t.y})  ${rr>=0?esc(names[rr]):'sea / outside all regions'}`;
+  if (v){ const st={normal:'Village',capital:'Capital',city:'City'}[vStatus(v)]+(v[8]&4?' · harbor':'');
+    html+=`\n<b>${esc(v[4])}</b>  (${st})\nPlayer: ${esc(v[5])}${v[6]?`  [${esc(v[6])}]`:''}\nTribe: ${(TRIBES[v[3]]||['?'])[0]} · Population: ${v[7]}${v[9]>0?`\nVictory points: ${v[9]}`:''}`; }
+  tip.innerHTML=html;
+  let tx=e.clientX-rect.left+14, ty=e.clientY-rect.top+14;
+  if (tx+tip.offsetWidth>main.clientWidth-4) tx=e.clientX-rect.left-14-tip.offsetWidth;
+  if (ty+tip.offsetHeight>main.clientHeight-4) ty=e.clientY-rect.top-14-tip.offsetHeight;
+  tip.style.left=Math.max(4,tx)+'px'; tip.style.top=Math.max(4,ty)+'px';
+});
+window.addEventListener('resize',()=>{ fit(); draw(); });
+for (const id of ['optLabels','optBorders','optGrid']) document.getElementById(id).addEventListener('change',draw);
+for (const id of ['optVillages','optMute']) document.getElementById(id).addEventListener('change',()=>{ paintBase(); draw(); });
+
+// sidebar
+const list=document.getElementById('list');
+document.getElementById('cnt').textContent=`${NR} regions · ${ACCURACY.agree}/${ACCURACY.checked} villages match the outlines (${(100*ACCURACY.agree/ACCURACY.checked).toFixed(1)}%)`;
+function renderList(f=''){
+  list.innerHTML=''; f=f.toLowerCase();
+  [...names.keys()].sort((a,b)=>names[a].localeCompare(names[b])).filter(r=>names[r].toLowerCase().includes(f)).forEach(r=>{
+    const d=document.createElement('div'); d.className='item'+(checked.has(r)?' sel':''); d.title='Click the name to zoom to this region';
+    d.innerHTML=`<input type="checkbox"${checked.has(r)?' checked':''}><span class="sw" style="background:${colors[r]}"></span><span class="n">${names[r]}</span><span class="c">${counts[r]}</span>`;
+    const cb=d.querySelector('input'); cb.onclick=e=>e.stopPropagation(); cb.onchange=()=>toggle(r);
+    d.onclick=()=>{ if(anchor[r]) centerOn(anchor[r].col,anchor[r].row); };
+    list.appendChild(d); });
+}
+function centerOn(col,row){ scale=Math.max(scale,4); ox=main.clientWidth/2-(col+.5)*scale; oy=main.clientHeight/2-(row+.5)*scale; draw(); }
+function refresh(){
+  try{ localStorage.setItem(STORE, JSON.stringify([...checked].map(r=>names[r]))); }catch(e){}
+  const n=checked.size, vil=[...checked].reduce((s,r)=>s+counts[r],0);
+  document.getElementById('selcount').textContent = n ? `${n} highlighted · ${vil} villages` : 'No regions highlighted';
+  document.getElementById('clearSel').disabled = !n;
+  paintBase(); renderList(document.getElementById('q').value); draw();
+}
+function toggle(r){ checked.has(r)?checked.delete(r):checked.add(r); refresh(); }
+document.getElementById('clearSel').onclick=()=>{ checked.clear(); refresh(); };
+document.getElementById('q').addEventListener('input',e=>{ const v=e.target.value, m=v.match(/^\s*\(?(-?\d+)\s*[|,\s]\s*(-?\d+)\)?\s*$/);
+  if(m){ const x=+m[1], y=+m[2]; if(Math.abs(x)<=200&&Math.abs(y)<=200) centerOn(x-MIN,200-y); } else renderList(v); });
+try{ if (localStorage.getItem('travian-rog-x2-list')){ document.getElementById('res').hidden=false; document.getElementById('resBtn').hidden=true; } }catch(e){}
+fit(); allyChanged(); refresh();
+</script>
+</body>
+</html>

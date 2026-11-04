@@ -1,0 +1,48 @@
+name: Update map
+
+# map.sql on rog.x2.europe.travian.com is regenerated every day at midnight server time (UTC).
+# Rebuild the page 10 minutes later and publish it to GitHub Pages.
+on:
+  schedule:
+    - cron: '10 0 * * *'
+  workflow_dispatch: {}   # "Run workflow" button for a manual refresh
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download map.sql and rebuild the page
+        run: python3 build/update_map.py
+
+      - name: Prepare site
+        run: |
+          mkdir -p _site
+          cp travian-regions.html _site/index.html
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
