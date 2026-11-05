@@ -6,7 +6,7 @@ Interactive map of the [rog.x2.europe.travian.com](https://rog.x2.europe.travian
 
 ## How it updates
 
-Travian regenerates the public `map.sql` every day at midnight server time (UTC). The GitHub Actions workflow [`.github/workflows/update-map.yml`](.github/workflows/update-map.yml) runs at 00:10 UTC, downloads it, rebuilds the page and deploys it. It can also be started by hand from the **Actions** tab (**Run workflow**).
+Travian regenerates the public `map.sql` every day at midnight server time (UTC). The GitHub Actions workflow [`.github/workflows/update-map.yml`](.github/workflows/update-map.yml) runs shortly after midnight UTC (with a backup run at 03:43 UTC), downloads it, rebuilds the page and deploys it. It can also be started by hand from the **Actions** tab (**Run workflow**).
 
 ## Files
 

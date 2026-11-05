@@ -1,10 +1,13 @@
 name: Update map
 
 # map.sql on rog.x2.europe.travian.com is regenerated every day at midnight server time (UTC).
-# Rebuild the page 10 minutes later and publish it to GitHub Pages.
+# GitHub delays or skips scheduled runs when it's busy, and around 00:00 UTC is its busiest
+# time, so run twice: shortly after midnight, and again a few hours later as a backup.
+# Each run just rebuilds from the current map.sql, so an extra run is harmless.
 on:
   schedule:
-    - cron: '10 0 * * *'
+    - cron: '17 0 * * *'
+    - cron: '43 3 * * *'
   workflow_dispatch: {}   # "Run workflow" button for a manual refresh
   push:
     branches: [main]
