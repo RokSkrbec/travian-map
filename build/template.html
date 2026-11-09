@@ -7,7 +7,17 @@
 <style>
   :root { --bg:#14171c; --panel:#1d2128; --line:#2b3039; --text:#e6e6e6; --muted:#9aa3ad; --accent:#f0c36a; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif; display:flex; height:100vh; overflow:hidden; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+  /* top bar with tabs */
+  #top { flex:none; display:flex; align-items:stretch; gap:18px; padding:0 14px; height:40px; background:var(--panel); border-bottom:1px solid var(--line); }
+  #top h1 { font-size:15px; margin:0; align-self:center; white-space:nowrap; }
+  .tabs { display:flex; gap:2px; }
+  .tabs button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; padding:0 12px; font-size:13px; color:var(--muted); }
+  .tabs button:hover { color:var(--text); }
+  .tabs button.on { color:var(--text); border-bottom-color:var(--accent); }
+  #app { flex:1; display:flex; min-height:0; }
+  #app[hidden], #plans[hidden] { display:none; }
   button { background:#2a303a; color:var(--text); border:1px solid #3a414d; border-radius:4px; padding:2px 8px; font-size:12px; cursor:pointer; font-family:inherit; }
   button:disabled { opacity:.4; cursor:default; }
   input[type=text], input[type=number] { padding:5px 8px; background:#111419; border:1px solid #333a45; color:var(--text); border-radius:4px; font:inherit; font-size:13px; width:100%; }
@@ -15,8 +25,7 @@
 
   /* sidebar */
   #side { width:330px; flex:none; background:var(--panel); display:flex; flex-direction:column; border-right:1px solid var(--line); }
-  #side h1 { font-size:16px; margin:14px 14px 4px; }
-  #side .sub { color:var(--muted); font-size:12px; margin:0 14px 8px; }
+  #side .sub { color:var(--muted); font-size:12px; margin:10px 14px 8px; }
   #sideScroll { flex:1; overflow:auto; border-top:1px solid var(--line); }
   details.panel { border-bottom:1px solid var(--line); }
   details.panel > summary { list-style:none; cursor:pointer; padding:9px 14px; font-weight:600; display:flex; align-items:center; gap:8px; user-select:none; }
@@ -77,11 +86,62 @@
   #resTable .sw { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
   #resMore { margin:10px; }
   #copyBox textarea { width:100%; height:120px; background:#111419; color:var(--text); border:1px solid #333a45; border-radius:4px; font:11px ui-monospace,monospace; }
+
+  /* alliance plans tab */
+  #plans { flex:1; overflow:auto; }
+  .pwrap { max-width:1180px; margin:0 auto; padding:18px 20px 80px; }
+  .phead { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; }
+  .phead h2 { margin:0; font-size:18px; }
+  .pbtns { margin-left:auto; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .pbtns input[type=text] { width:200px; }
+  .pbtns button, .pcard button { padding:4px 10px; }
+  button.primary { background:#6b5521; border-color:#9a7c34; }
+  .note { color:var(--muted); font-size:12px; }
+  .pmsg { margin:12px 0 0; padding:8px 12px; border-radius:4px; background:#232831; font-size:13px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .pmsg:empty { display:none; }
+  .pmsg.err { background:#4a2626; } .pmsg.ok { background:#21402b; } .pmsg.warn { background:#4a3b1c; }
+  #pToken { margin:12px 0 0; padding:12px 14px; background:var(--panel); border:1px solid var(--line); border-radius:6px; font-size:13px; }
+  #pToken ol { margin:6px 0; padding-left:20px; color:var(--muted); }
+  #pToken input { max-width:420px; }
+  #pToken a, .pwrap a { color:var(--accent); }
+  .pconf { margin:14px 0 0; padding:8px 12px; border:1px solid #6b5521; border-radius:6px; font-size:13px; }
+  .pcard { background:var(--panel); border:1px solid var(--line); border-radius:6px; margin:16px 0; padding:12px 16px 16px; }
+  .pcard > header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .pcard > header .sp { margin-left:auto; display:flex; gap:6px; }
+  .pcard h3 { margin:0; font-size:17px; }
+  .pcard h4 { margin:16px 0 6px; font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:10px; }
+  .pcard h4 .note { text-transform:none; letter-spacing:0; font-weight:400; }
+  .pcard .sw { width:12px; height:12px; border-radius:2px; flex:none; display:inline-block; }
+  .tw { overflow-x:auto; }
+  .ptab { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .ptab th { text-align:left; color:var(--muted); font-weight:500; padding:4px 6px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .ptab td { padding:4px 6px; border-bottom:1px solid #22262e; white-space:nowrap; }
+  .ptab .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .ptab td.act { text-align:right; width:1%; }
+  .ptab td.act button { padding:1px 7px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .chip { display:inline-flex; align-items:center; gap:2px; border:1px solid #3a414d; border-radius:12px; padding:2px 8px 2px 10px; background:#232831; font-size:12.5px; }
+  .chip input[type=text] { background:none; border:0; padding:0; width:auto; font-size:12.5px; }
+  .chip button { background:none; border:0; padding:0 2px; color:var(--muted); }
+  .chips input.newteam { width:150px; }
+  select { background:#111419; color:var(--text); border:1px solid #333a45; border-radius:4px; padding:3px 6px; font:inherit; font-size:12.5px; max-width:220px; }
+  .warn { color:#ffb454; }
+  a.rg { color:var(--text); text-decoration:none; border-bottom:1px dotted var(--muted); cursor:pointer; }
+  a.rg:hover { color:var(--accent); }
+  .shb { display:inline-block; width:46px; height:6px; background:#2b3039; border-radius:3px; vertical-align:middle; margin-right:6px; overflow:hidden; }
+  .shb i { display:block; height:100%; background:var(--accent); }
+  textarea.pnotes { width:100%; min-height:54px; background:#111419; color:var(--text); border:1px solid #333a45; border-radius:4px; font:inherit; font-size:13px; padding:6px 8px; resize:vertical; }
+  .pnotesv { white-space:pre-wrap; font-size:13px; }
+  .empty { margin:30px 0; color:var(--muted); text-align:center; }
 </style>
 </head>
 <body>
-<div id="side">
+<div id="top">
   <h1>Ancient Europe regions</h1>
+  <nav class="tabs"><button data-tab="map" class="on">Map</button><button data-tab="plans">Alliance plans</button></nav>
+</div>
+<div id="app">
+<div id="side">
   <div class="sub">rog.x2.europe.travian.com · official region outlines · villages from map.sql downloaded __DATE__ · <span id="cnt"></span></div>
   <div id="sideScroll">
     <details class="panel" data-k="regions" open>
@@ -156,6 +216,40 @@
   </div>
   <div id="resWrap"><table id="resTable"><thead></thead><tbody></tbody></table><button id="resMore" hidden></button></div>
 </div>
+</div>
+<div id="plans" hidden>
+  <div class="pwrap">
+    <div class="phead">
+      <h2>Alliance plans</h2>
+      <span class="note" id="pStatus"></span>
+      <div class="pbtns">
+        <span id="pEdit" style="display:contents">
+          <input type="text" id="pAddAlly" list="allyDL" placeholder="Add alliance (tag)…">
+          <button id="pAddBtn">Add</button>
+          <button id="pDiscard" disabled>Discard changes</button>
+          <button id="pSave" class="primary" disabled>Save for everyone</button>
+        </span>
+        <button id="pCopy" title="Copy the whole plan as text, e.g. to paste into Discord">Copy as text</button>
+        <button id="pReload" title="Load the latest saved plan">Reload</button>
+        <button id="pEditor">Editor access</button>
+      </div>
+    </div>
+    <div class="pmsg" id="pMsg"></div>
+    <div id="pToken" hidden>
+      <b>Editor access</b>
+      <div class="note">Anyone can view the plans. Saving writes <code>plans.json</code> into the GitHub repo, so editors need a GitHub token with write access to it. The token stays in this browser only.</div>
+      <ol>
+        <li>Repo owner: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">create a fine-grained token</a> → Repository access: only <b>RokSkrbec/travian-map</b> → Permissions: <b>Contents: Read and write</b>.</li>
+        <li>Other leaders: be added as a collaborator on the repo, then create a <a href="https://github.com/settings/tokens/new?scopes=public_repo&amp;description=Travian%20plans" target="_blank" rel="noopener">classic token</a> with the <b>public_repo</b> scope (fine-grained tokens can't write to someone else's personal repo).</li>
+      </ol>
+      <div class="bar" style="justify-content:flex-start"><input type="password" id="pTokIn" placeholder="Paste token (github_pat_… or ghp_…)" autocomplete="off"><button id="pTokSave" class="primary">Use token</button><button id="pTokDel">Remove token</button><button id="pTokClose">Close</button></div>
+      <div class="note" id="pTokNote"></div>
+    </div>
+    <div id="pConf"></div>
+    <div id="pList"></div>
+  </div>
+</div>
+<datalist id="allyDL"></datalist>
 <script>
 const DATA = __DATA__;
 const N = 401, MIN = -200, S = N / 185;
@@ -569,7 +663,7 @@ window.addEventListener('mousemove',e=>{
   if (ty+tip.offsetHeight>main.clientHeight-4) ty=e.clientY-rect.top-14-tip.offsetHeight;
   tip.style.left=Math.max(4,tx)+'px'; tip.style.top=Math.max(4,ty)+'px';
 });
-window.addEventListener('resize',()=>{ fit(); draw(); });
+window.addEventListener('resize',()=>{ if (!main.clientWidth){ needFit=true; return; } fit(); draw(); });
 for (const id of ['optLabels','optBorders','optGrid','optTiles']) document.getElementById(id).addEventListener('change',draw);
 for (const id of ['optVillages','optMute','optColors']) document.getElementById(id).addEventListener('change',()=>{ paintBase(); draw(); });
 
@@ -598,7 +692,282 @@ document.getElementById('clearSel').onclick=()=>{ checked.clear(); refresh(); };
 document.getElementById('q').addEventListener('input',e=>{ const v=e.target.value, m=v.match(/^\s*\(?(-?\d+)\s*[|,\s]\s*(-?\d+)\)?\s*$/);
   if(m){ const x=+m[1], y=+m[2]; if(Math.abs(x)<=200&&Math.abs(y)<=200) centerOn(x-MIN,200-y); } else renderList(v); });
 try{ if (localStorage.getItem('travian-rog-x2-list')){ document.getElementById('res').hidden=false; document.getElementById('resBtn').hidden=true; } }catch(e){}
+
+// ---------- tabs ----------
+let needFit=false;
+function setTab(t){
+  const plans = t==='plans';
+  document.getElementById('app').hidden=plans; document.getElementById('plans').hidden=!plans;
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
+  if (location.hash !== (plans?'#plans':'') ) history.replaceState(null,'', plans ? '#plans' : location.pathname+location.search);
+  if (plans) renderPlans(); else { if (needFit||!(scale>0.5)) { fit(); needFit=false; } draw(); }
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+
+// ---------- alliance plans (shared through plans.json in the GitHub repo) ----------
+const REPO='RokSkrbec/travian-map', API=`https://api.github.com/repos/${REPO}/contents/plans.json`;
+const TOKEN_KEY='travian-rog-x2-gh-token', DRAFT_KEY='travian-rog-x2-plan-draft';
+let token=''; try{ token=localStorage.getItem(TOKEN_KEY)||''; }catch(e){}
+const fmt=n=>Number(n).toLocaleString('en-US');
+const regSorted=[...names].sort((a,b)=>a.localeCompare(b));
+const regOptions=sel=>'<option value="">— choose region —</option>'+regSorted.map(n=>`<option${n===sel?' selected':''}>${esc(n)}</option>`).join('');
+// villages / population / VP per region, split by alliance
+const regStats=names.map(()=>({n:0,pop:0,by:new Map()}));
+const allyVP=new Map();
+for (const v of V){ allyVP.set(v[6],(allyVP.get(v[6])||0)+v[9]); if (v[2]<0) continue;
+  const s=regStats[v[2]]; s.n++; s.pop+=v[7];
+  let a=s.by.get(v[6]); if(!a){ a={n:0,pop:0,vp:0}; s.by.set(v[6],a); } a.n++; a.pop+=v[7]; a.vp+=v[9]; }
+const allyByTag=new Map(allies.map(a=>[a.tag,a]));
+document.getElementById('allyDL').innerHTML=allies.filter(a=>a.tag).map(a=>`<option value="${esc(a.tag)}">${a.n} villages · ${fmt(a.pop)} pop</option>`).join('');
+
+let plan={alliances:[]}, loadedText=null, savedSig='[]', confirmDel=-1;
+const sig=()=>JSON.stringify(plan.alliances);
+const dirty=()=>loadedText!==null && sig()!==savedSig;
+function normPlan(p){
+  const out={updated:p&&p.updated||'', alliances:[]};
+  for (const a of (p&&Array.isArray(p.alliances)?p.alliances:[])) out.alliances.push({
+    tag:String(a.tag||''),
+    teams:(a.teams||[]).map(t=>({name:String(t.name||''), region:String(t.region||'')})),
+    taken:(a.taken||[]).map(String),
+    planned:(a.planned||[]).map(x=>({region:String(x.region||''), team:String(x.team||'')})),
+    notes:String(a.notes||'') });
+  return out;
+}
+const b64dec=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,'')),c=>c.charCodeAt(0)));
+const b64enc=s=>{ const b=new TextEncoder().encode(s); let r=''; for (let i=0;i<b.length;i+=0x8000) r+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000)); return btoa(r); };
+const ghHeaders=()=>Object.assign({Accept:'application/vnd.github+json'}, token?{Authorization:'Bearer '+token}:{});
+function pMsg(html,kind=''){ const m=document.getElementById('pMsg'); m.className='pmsg '+kind; m.innerHTML=html; }
+
+// returns the file text currently on GitHub ('' if there is no plans.json yet)
+async function fetchPlanText(){
+  let r;
+  try { r=await fetch(API+'?ref=main', {headers:ghHeaders(), cache:'no-store'}); } catch(e){ r=null; }
+  if (r && r.status===404) return '';
+  if (r && r.ok) return b64dec((await r.json()).content);
+  if (r && r.status===401) throw new Error('GitHub rejected the saved token (expired or revoked). Open Editor access and paste a new one.');
+  // anonymous API limit is 60 requests an hour per network: fall back to the raw file
+  const raw=await fetch(`https://raw.githubusercontent.com/${REPO}/main/plans.json?t=${Date.now()}`, {cache:'no-store'});
+  if (raw.status===404) return '';
+  if (!raw.ok) throw new Error(`GitHub answered ${r?r.status:'(no answer)'} / ${raw.status}`);
+  return await raw.text();
+}
+async function loadPlan(keepDraft=true){
+  pMsg('Loading plans…');
+  try {
+    const text=await fetchPlanText();
+    loadedText=text; plan=normPlan(text?JSON.parse(text):null); savedSig=sig(); pMsg('');
+    let d=null; try{ d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); }catch(e){}
+    if (d && keepDraft && token){
+      if (d.base===text){ plan.alliances=normPlan(d).alliances; if (dirty()) pMsg('Restored your unsaved changes from last time.','warn'); }
+      else { try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+        pMsg('Someone saved the plans after your last unsaved edits, so those edits were dropped and you see the latest version.','warn'); }
+    }
+  } catch(e){ pMsg('Could not load the plans: '+esc(e.message),'err'); }
+  renderPlans();
+}
+function changed(){
+  try{ if (dirty()) localStorage.setItem(DRAFT_KEY, JSON.stringify({base:loadedText, alliances:plan.alliances}));
+       else localStorage.removeItem(DRAFT_KEY); }catch(e){}
+  renderPlans();
+}
+async function savePlan(force=false){
+  if (!token) return;
+  const btn=document.getElementById('pSave'); btn.disabled=true; pMsg('Saving…');
+  try {
+    const cur=await fetch(API+'?ref=main', {headers:ghHeaders(), cache:'no-store'});
+    let sha, text='';
+    if (cur.ok){ const j=await cur.json(); sha=j.sha; text=b64dec(j.content); }
+    else if (cur.status!==404) throw new Error(cur.status===401 ? 'GitHub rejected the token (expired or revoked).' : `GitHub answered ${cur.status}.`);
+    if (!force && text!==loadedText){
+      pMsg('Someone else saved the plans after you loaded them. <button id="pTheirs">Load their version (drop my changes)</button><button id="pMine">Overwrite with mine</button>','warn');
+      document.getElementById('pTheirs').onclick=()=>{ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} loadPlan(false); };
+      document.getElementById('pMine').onclick=()=>savePlan(true);
+      btn.disabled=false; return;
+    }
+    const out={updated:new Date().toISOString(), alliances:plan.alliances}, newText=JSON.stringify(out,null,2)+'\n';
+    const body={message:'Update alliance plans [skip ci]', content:b64enc(newText), branch:'main'}; if (sha) body.sha=sha;
+    const r=await fetch(API, {method:'PUT', headers:Object.assign(ghHeaders(),{'Content-Type':'application/json'}), body:JSON.stringify(body)});
+    if (!r.ok){
+      if (r.status===409) return savePlan(false);   // changed between our check and the write: re-check
+      throw new Error(r.status===401 ? 'GitHub rejected the token (expired or revoked).'
+        : r.status===403||r.status===404 ? 'This token is not allowed to write to the repo. Check its permissions (Contents: Read and write).' : `GitHub answered ${r.status}.`);
+    }
+    loadedText=newText; plan.updated=out.updated; savedSig=sig();
+    try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+    pMsg('Saved. Everyone sees the new plan when they open or reload this tab.','ok');
+  } catch(e){ pMsg('Not saved: '+esc(e.message),'err'); }
+  renderPlans();
+}
+
+// which alliances mention each region, for clash warnings
+function planIndex(){
+  const m=new Map(), add=(rn,tag,st)=>{ if(!rn) return; if(!m.has(rn)) m.set(rn,[]); m.get(rn).push({tag,st}); };
+  for (const a of plan.alliances){
+    for (const r of a.taken) add(r,a.tag,'taken');
+    for (const t of a.teams) add(t.region,a.tag,'settling'+(t.name?' · '+t.name:''));
+    a.planned.forEach((p,i)=>add(p.region,a.tag,'planned #'+(i+1)));
+  }
+  return m;
+}
+const STAT_TH='<th class="num" title="Villages of this alliance / all villages in the region">Villages</th><th class="num">Our pop.</th><th class="num">Our VP</th><th title="This alliance\'s share of the region\'s population">Pop. share</th><th>Strongest other alliance</th><th>Also in plans of</th>';
+function statCells(tag,rn,idx){
+  const r=nameIdx[rn]; if (r==null) return '<td colspan="6"></td>';
+  const s=regStats[r], me=s.by.get(tag)||{n:0,pop:0,vp:0}, sh=s.pop?me.pop/s.pop:0; let rv=null;
+  for (const [t,x] of s.by) if (t && t!==tag && (!rv||x.pop>rv.pop)) rv={tag:t,...x};
+  const others=(idx.get(rn)||[]).filter(o=>o.tag!==tag);
+  return `<td class="num">${me.n} / ${s.n}</td><td class="num">${fmt(me.pop)}</td><td class="num">${me.vp?fmt(me.vp):''}</td>`+
+    `<td><span class="shb"><i style="width:${(sh*100).toFixed(1)}%"></i></span>${Math.round(sh*100)}%</td>`+
+    `<td>${rv?`${esc(rv.tag)} <span class="note">${rv.n} vill. · ${fmt(rv.pop)} pop</span>`:'<span class="note">—</span>'}</td>`+
+    `<td>${others.length?`<span class="warn">⚠ ${others.map(o=>esc(o.tag)+' <span class="note">('+esc(o.st)+')</span>').join(', ')}</span>`:''}</td>`;
+}
+const rlink=rn=>rn?`<a class="rg" data-act="goto" data-r="${esc(rn)}" title="Show on the map">${esc(rn)}</a>`:'<span class="note">—</span>';
+
+function renderPlans(){
+  const ed=!!token, idx=planIndex(), d=dirty();
+  document.getElementById('pEdit').style.display = ed ? 'contents' : 'none';
+  document.getElementById('pEditor').textContent = ed ? 'Editor access ✓' : 'Editor access';
+  document.getElementById('pSave').disabled=!d; document.getElementById('pDiscard').disabled=!d;
+  document.getElementById('pStatus').innerHTML = loadedText===null ? '' :
+    (plan.updated ? `Last saved ${esc(plan.updated.replace('T',' ').slice(0,16))} UTC` : 'Nothing saved yet') +
+    (d ? ' · <span class="warn">unsaved changes</span>' : '') + (ed ? '' : ' · view only');
+  // regions that more than one alliance has in its plan
+  const clash=[...idx].filter(([,l])=>new Set(l.map(o=>o.tag)).size>1).sort((a,b)=>a[0].localeCompare(b[0]));
+  document.getElementById('pConf').innerHTML = clash.length ? `<div class="pconf"><b class="warn">⚠ Regions in more than one alliance's plan</b><br>`+
+    clash.map(([rn,l])=>`${rlink(rn)}: ${l.map(o=>esc(o.tag)+' <span class="note">('+esc(o.st)+')</span>').join(', ')}`).join('<br>')+'</div>' : '';
+  const el=document.getElementById('pList');
+  if (!plan.alliances.length){
+    el.innerHTML = loadedText===null ? '' : `<div class="empty">No alliances in the plan yet.${ed?' Add one with the box above.':' Leaders can add them with Editor access.'}</div>`; return; }
+  el.innerHTML = plan.alliances.map((a,ai)=>{
+    const info=allyByTag.get(a.tag), col=PAL[ai%PAL.length];
+    const teamOpts=sel=>'<option value="">— any team —</option>'+a.teams.map(t=>`<option${t.name===sel?' selected':''}>${esc(t.name)}</option>`).join('');
+    let h=`<section class="pcard" data-ai="${ai}"><header><span class="sw" style="background:${col}"></span><h3>${esc(a.tag)}</h3>`+
+      `<span class="note">${info?`${info.players.size} players · ${info.n} villages · ${fmt(info.pop)} pop · ${fmt(allyVP.get(a.tag)||0)} VP`:'not in today\'s map.sql (renamed or disbanded?)'}</span>`+
+      (ed?`<span class="sp">${ai>0?'<button data-act="aUp" title="Move up">↑</button>':''}${ai<plan.alliances.length-1?'<button data-act="aDown" title="Move down">↓</button>':''}`+
+        `<button data-act="delAlly">${confirmDel===ai?'Click again to remove':'Remove alliance'}</button></span>`:'')+`</header>`;
+    // teams
+    h+=`<h4>Teams</h4><div class="chips">`+(a.teams.length||ed?'':'<span class="note">No teams.</span>')+
+      a.teams.map((t,ti)=> ed ? `<span class="chip"><input type="text" data-act="teamName" data-i="${ti}" value="${esc(t.name)}" size="${Math.max(4,t.name.length)}" title="Rename team"><button data-act="delTeam" data-i="${ti}" title="Remove team">✕</button></span>`
+                             : `<span class="chip">${esc(t.name)}</span>`).join('')+
+      (ed?`<input type="text" class="newteam" data-act="newTeam" placeholder="New team (e.g. North)"><button data-act="addTeam">Add team</button>`:'')+`</div>`;
+    // settling now: one region per team
+    h+=`<h4>Settling now <span class="note">the region each team should settle next</span></h4>`;
+    h+= a.teams.length ? `<div class="tw"><table class="ptab"><tr><th>Team</th><th>Region</th>${STAT_TH}</tr>`+
+      a.teams.map((t,ti)=>`<tr><td>${esc(t.name)}</td><td>${ed?`<select data-act="teamRegion" data-i="${ti}">${regOptions(t.region)}</select> `:''}${t.region&&ed?rlink(t.region).replace('>'+esc(t.region)+'<','>↗<'):(ed?'':rlink(t.region))}</td>${t.region?statCells(a.tag,t.region,idx):'<td colspan="6"></td>'}</tr>`).join('')+`</table></div>`
+      : `<div class="note">${ed?'Add a team above, then pick the region it should settle.':'No teams yet.'}</div>`;
+    // taken
+    h+=`<h4>Taken <span class="note">regions already claimed</span></h4>`;
+    h+= a.taken.length ? `<div class="tw"><table class="ptab"><tr><th>Region</th>${STAT_TH}${ed?'<th></th>':''}</tr>`+
+      a.taken.map((rn,i)=>`<tr><td>${rlink(rn)}</td>${statCells(a.tag,rn,idx)}${ed?`<td class="act"><button data-act="delTaken" data-i="${i}" title="Remove">✕</button></td>`:''}</tr>`).join('')+`</table></div>`
+      : `<div class="note">None yet.</div>`;
+    if (ed) h+=`<div class="bar" style="justify-content:flex-start"><select data-act="addTaken">${regOptions('').replace('— choose region —','+ Add taken region…')}</select></div>`;
+    // planned
+    h+=`<h4>Planned next <span class="note">in order</span></h4>`;
+    h+= a.planned.length ? `<div class="tw"><table class="ptab"><tr><th>#</th><th>Region</th><th>Team</th>${STAT_TH}${ed?'<th></th>':''}</tr>`+
+      a.planned.map((p,i)=>`<tr><td>${i+1}</td><td>${rlink(p.region)}</td><td>${ed?`<select data-act="planTeam" data-i="${i}">${teamOpts(p.team)}</select>`:(p.team?esc(p.team):'<span class="note">any</span>')}</td>${statCells(a.tag,p.region,idx)}`+
+        (ed?`<td class="act">${i>0?`<button data-act="pUp" data-i="${i}" title="Move up">↑</button>`:''}${i<a.planned.length-1?`<button data-act="pDown" data-i="${i}" title="Move down">↓</button>`:''}<button data-act="pToTaken" data-i="${i}" title="Mark as taken">✓ taken</button><button data-act="delPlan" data-i="${i}" title="Remove">✕</button></td>`:'')+`</tr>`).join('')+`</table></div>`
+      : `<div class="note">Nothing planned yet.</div>`;
+    if (ed) h+=`<div class="bar" style="justify-content:flex-start"><select data-act="addPlan">${regOptions('').replace('— choose region —','+ Add planned region…')}</select></div>`;
+    // notes
+    h+=`<h4>Notes</h4>`+(ed?`<textarea class="pnotes" data-act="notes" placeholder="Anything the teams should know">${esc(a.notes)}</textarea>`
+      : (a.notes?`<div class="pnotesv">${esc(a.notes)}</div>`:'<div class="note">—</div>'));
+    return h+'</section>';
+  }).join('');
+}
+
+// editing (all through event delegation on the list)
+const pList=document.getElementById('pList');
+function ctxOf(e){ const card=e.target.closest('.pcard'); if(!card) return null; const a=plan.alliances[+card.dataset.ai];
+  return {a, ai:+card.dataset.ai, i:+e.target.dataset.i, act:e.target.dataset.act}; }
+const swap=(arr,i,j)=>{ [arr[i],arr[j]]=[arr[j],arr[i]]; };
+pList.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]'); if(!t) return;
+  if (t.dataset.act==='goto'){ e.preventDefault(); const r=nameIdx[t.dataset.r]; setTab('map'); if (anchor[r]){ checked.add(r); refresh(); centerOn(anchor[r].col,anchor[r].row); } return; }
+  if (t.tagName!=='BUTTON') return;
+  const c=ctxOf({target:t}); if(!c) return; const {a,ai,i}=c;
+  switch(t.dataset.act){
+    case 'delAlly': if (confirmDel!==ai){ confirmDel=ai; renderPlans(); return; } plan.alliances.splice(ai,1); break;
+    case 'aUp': swap(plan.alliances,ai,ai-1); break;
+    case 'aDown': swap(plan.alliances,ai,ai+1); break;
+    case 'addTeam': { const inp=t.parentElement.querySelector('.newteam'), n=inp.value.trim();
+      if (!n || a.teams.some(x=>x.name.toLowerCase()===n.toLowerCase())) { inp.focus(); return; } a.teams.push({name:n,region:''}); break; }
+    case 'delTeam': { const n=a.teams[i].name; a.teams.splice(i,1); a.planned.forEach(p=>{ if(p.team===n) p.team=''; }); break; }
+    case 'delTaken': a.taken.splice(i,1); break;
+    case 'delPlan': a.planned.splice(i,1); break;
+    case 'pUp': swap(a.planned,i,i-1); break;
+    case 'pDown': swap(a.planned,i,i+1); break;
+    case 'pToTaken': { const rn=a.planned[i].region; a.planned.splice(i,1); if (!a.taken.includes(rn)) a.taken.push(rn); break; }
+    default: return;
+  }
+  confirmDel=-1; changed();
+});
+pList.addEventListener('keydown',e=>{ if (e.key==='Enter' && e.target.dataset.act==='newTeam') e.target.nextElementSibling.click(); });
+pList.addEventListener('change',e=>{
+  const c=ctxOf(e); if(!c||!c.act) return; const {a,i}=c, v=e.target.value;
+  switch(c.act){
+    case 'teamName': { const n=v.trim(), old=a.teams[i].name;
+      if (!n || a.teams.some((x,j)=>j!==i && x.name.toLowerCase()===n.toLowerCase())) { e.target.value=old; return; }
+      a.teams[i].name=n; a.planned.forEach(p=>{ if(p.team===old) p.team=n; }); break; }
+    case 'teamRegion': a.teams[i].region=v; break;
+    case 'addTaken': if (!v) return; if (!a.taken.includes(v)) a.taken.push(v); a.planned=a.planned.filter(p=>p.region!==v); break;
+    case 'addPlan': if (!v) return; if (!a.planned.some(p=>p.region===v)) a.planned.push({region:v,team:''}); break;
+    case 'planTeam': a.planned[i].team=v; break;
+    case 'notes': a.notes=v; break;
+    case 'newTeam': return;
+    default: return;
+  }
+  changed();
+});
+document.getElementById('pAddBtn').onclick=()=>{
+  const inp=document.getElementById('pAddAlly'), tag=inp.value.trim();
+  const real=allies.find(x=>x.tag && x.tag.toLowerCase()===tag.toLowerCase());
+  if (!real){ pMsg(tag?`No alliance tagged “${esc(tag)}” in today's map.sql.`:'Type an alliance tag first.','err'); return; }
+  if (plan.alliances.some(x=>x.tag===real.tag)){ pMsg(`${esc(real.tag)} is already in the plan.`,'warn'); return; }
+  plan.alliances.push({tag:real.tag, teams:[], taken:[], planned:[], notes:''}); inp.value=''; pMsg(''); changed();
+};
+document.getElementById('pAddAlly').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('pAddBtn').click(); });
+document.getElementById('pSave').onclick=()=>savePlan(false);
+document.getElementById('pDiscard').onclick=()=>{ plan=normPlan(loadedText?JSON.parse(loadedText):null); savedSig=sig(); confirmDel=-1; pMsg(''); changed(); };
+document.getElementById('pReload').onclick=()=>{
+  if (dirty()){ pMsg('You have unsaved changes. <button id="pRl">Reload anyway (drop them)</button>','warn');
+    document.getElementById('pRl').onclick=()=>{ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} loadPlan(false); }; return; }
+  loadPlan(false);
+};
+document.getElementById('pCopy').onclick=async e=>{
+  const L=[];
+  for (const a of plan.alliances){
+    L.push(`[${a.tag}]`);
+    if (a.teams.length) L.push('Settling now: '+a.teams.map(t=>`${t.name} → ${t.region||'(not set)'}`).join(' · '));
+    if (a.taken.length) L.push('Taken: '+a.taken.join(', '));
+    if (a.planned.length) L.push('Planned next: '+a.planned.map((p,i)=>`${i+1}. ${p.region}${p.team?` (${p.team})`:''}`).join(', '));
+    if (a.notes) L.push('Notes: '+a.notes);
+    L.push('');
+  }
+  const btn=e.currentTarget, old=btn.textContent;
+  try{ await navigator.clipboard.writeText(L.join('\n').trim()); btn.textContent='Copied'; }catch(_){ btn.textContent='Copy blocked by browser'; }
+  setTimeout(()=>btn.textContent=old,1600);
+};
+// editor token
+const tokBox=document.getElementById('pToken');
+document.getElementById('pEditor').onclick=()=>{ tokBox.hidden=!tokBox.hidden; document.getElementById('pTokNote').textContent = token?'A token is saved in this browser.':''; };
+document.getElementById('pTokClose').onclick=()=>{ tokBox.hidden=true; };
+document.getElementById('pTokDel').onclick=()=>{ token=''; try{ localStorage.removeItem(TOKEN_KEY); }catch(e){} document.getElementById('pTokNote').textContent='Token removed. This browser is view-only now.'; renderPlans(); };
+document.getElementById('pTokSave').onclick=async()=>{
+  const inp=document.getElementById('pTokIn'), tk=inp.value.trim(), note=document.getElementById('pTokNote'); if(!tk) return;
+  note.textContent='Checking token…';
+  try{
+    const r=await fetch(`https://api.github.com/repos/${REPO}`,{headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+tk}});
+    if (!r.ok) throw new Error(r.status===401?'GitHub says this token is invalid.':`GitHub answered ${r.status}.`);
+    const j=await r.json();
+    if (!(j.permissions&&j.permissions.push)) throw new Error('This token can read the repo but not write to it.');
+    token=tk; try{ localStorage.setItem(TOKEN_KEY,tk); }catch(e){} inp.value=''; tokBox.hidden=true;
+    pMsg('Editor access on. Changes are only shared once you press “Save for everyone”.','ok'); renderPlans();
+  }catch(err){ note.textContent=err.message; }
+};
+window.addEventListener('beforeunload',e=>{ if (dirty()){ e.preventDefault(); e.returnValue=''; } });
+
 fit(); allyChanged(); refresh();
+loadPlan();
+if (location.hash==='#plans'){ needFit=true; setTab('plans'); }
 </script>
 </body>
 </html>
