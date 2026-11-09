@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09T18:36:37.195Z",
+  "updated": "2026-11-09T18:37:58.988Z",
   "alliances": [
     {
       "tag": "B.U.",
@@ -44,6 +44,21 @@
         "Ulpiana",
         "Teutones",
         "Paraitonion"
+      ],
+      "planned": [],
+      "notes": ""
+    },
+    {
+      "tag": "BU-UN",
+      "teams": [],
+      "taken": [
+        "Durnonovaria",
+        "Treverorum",
+        "Mogontiacum",
+        "Argentorate",
+        "Bagacum",
+        "Memphis",
+        "Augustodunum"
       ],
       "planned": [],
       "notes": ""
