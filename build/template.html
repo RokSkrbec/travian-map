@@ -58,6 +58,12 @@
   .seg label { margin:0 !important; padding:2px 10px; cursor:pointer; }
   .seg input { display:none; }
   .seg label:has(input:checked) { background:#3a414d; color:var(--text); }
+  #ovList label { margin:3px 0; }
+  #ovList .t { flex:1; color:var(--text); }
+  .ovtri { display:inline-flex; border-radius:2px; overflow:hidden; flex:none; }
+  .ovtri i, .ovs { width:9px; height:12px; display:inline-block; }
+  .ovs { width:12px; border-radius:2px; vertical-align:-2px; margin-right:4px; }
+  .ovleg { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0; color:var(--text); }
   #foot { padding:8px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:8px; }
 
   /* map */
@@ -150,6 +156,14 @@
         <input type="text" id="q" placeholder="Filter regions… or go to x|y">
         <div class="bar"><span id="selcount">No regions highlighted</span><button id="clearSel" disabled>Clear</button></div>
         <div id="list"></div>
+      </div>
+    </details>
+    <details class="panel" data-k="overlay" open>
+      <summary>Alliance plans overlay <span class="badge" id="ovBadge"></span></summary>
+      <div class="body">
+        <div id="ovList"></div>
+        <div class="ovleg"><span><i class="ovs" style="background:hsl(0,0%,30%)"></i>Taken</span><span><i class="ovs" style="background:hsl(0,0%,52%)"></i>Settling now</span><span><i class="ovs" style="background:hsl(0,0%,74%)"></i>Planned next</span></div>
+        <div>Same colour per alliance: darkest = taken, middle = settling now, lightest = planned next. Stripes = region in several shown plans. Other regions turn grey.</div>
       </div>
     </details>
     <details class="panel" data-k="display">
@@ -357,8 +371,15 @@ for (let i=0;i<N*N;i++){ const r=grid[i]; if(r<0) continue; area[r]++; if(!ancho
 const base = document.createElement('canvas'); base.width=N; base.height=N;
 function paintBase(){
   const bctx=base.getContext('2d'), img=bctx.createImageData(N,N);
+  ovRegions=overlayRegions(); const ovOn=ovRegions.size>0, ovRgb={};
+  for (const l of ovRegions.values()) for (const e of l){ const k=e.ai+e.st; if(!ovRgb[k]) ovRgb[k]=hslToRgb(ovCss(e.ai,e.st)); }
   for (let i=0;i<N*N;i++){ const r=grid[i], o=i*4;
     if (r<0){ img.data[o]=28; img.data[o+1]=46; img.data[o+2]=66; img.data[o+3]=255; continue; }
+    if (ovOn){   // plan overlay: plan regions in alliance shades (diagonal stripes when shared), the rest grey
+      const l=ovRegions.get(r), dim=checked.size && !checked.has(r);
+      if (!l){ const g=dim?48:58; img.data[o]=g; img.data[o+1]=g+2; img.data[o+2]=g+6; img.data[o+3]=255; continue; }
+      const e=l.length>1 ? l[Math.floor(((i/N|0)+i%N)/4)%l.length] : l[0], c=ovRgb[e.ai+e.st], f=dim?.5:1;
+      img.data[o]=c[0]*f; img.data[o+1]=c[1]*f; img.data[o+2]=c[2]*f; img.data[o+3]=255; continue; }
     // Region colours off: plain grey land so village colours stand out (highlighted regions a bit lighter)
     if (!opt('optColors')){ const g = checked.size && checked.has(r) ? 92 : 58;
       img.data[o]=g; img.data[o+1]=g+2; img.data[o+2]=g+6; img.data[o+3]=255; continue; }
@@ -368,6 +389,28 @@ function paintBase(){
     img.data[o]=a; img.data[o+1]=b; img.data[o+2]=c; img.data[o+3]=255; }
   bctx.putImageData(img,0,0);
 }
+// ---------- alliance plans overlay ----------
+const OV_HUES=[0,205,48,125,295,265,22,170,330,85,188,238];
+const OV_ST=['taken','settling','planned'];
+const OV_L={taken:'32%',settling:'50%',planned:'72%'}, OV_S={taken:'62%',settling:'72%',planned:'55%'};
+const ovCss=(ai,st)=>`hsl(${OV_HUES[ai%OV_HUES.length]+(ai>=OV_HUES.length?15:0)},${OV_S[st]},${OV_L[st]})`;
+const OV_KEY='travian-rog-x2-overlay';
+let ovOff=new Set(); try{ ovOff=new Set(JSON.parse(localStorage.getItem(OV_KEY)||'[]')); }catch(e){}   // alliances the viewer unticked
+// region index -> [{ai, tag, st, team, n}] for the alliances shown on the map (best status per alliance)
+function overlayRegions(){
+  const m=new Map(); if (typeof plan==='undefined') return m;
+  plan.alliances.forEach((a,ai)=>{ if (ovOff.has(a.tag)) return;
+    const put=(rn,st,extra)=>{ const r=nameIdx[rn]; if (r==null) return; let l=m.get(r); if(!l){ l=[]; m.set(r,l); }
+      const e=l.find(x=>x.ai===ai);
+      if (!e) l.push({ai,tag:a.tag,st,...extra}); else if (OV_ST.indexOf(st)<OV_ST.indexOf(e.st)) Object.assign(e,{st,...extra}); else if (st==='settling'&&e.st==='settling') e.team+=', '+extra.team; };
+    a.taken.forEach(rn=>put(rn,'taken',{}));
+    a.teams.forEach(t=>put(t.region,'settling',{team:t.name}));
+    a.planned.forEach((p,i)=>put(p.region,'planned',{n:i+1, team:p.team}));
+  });
+  return m;
+}
+let ovRegions=new Map();
+const ovText=e=>e.tag+': '+(e.st==='taken'?'taken':e.st==='settling'?'settling'+(e.team?' ('+e.team+')':''):'planned #'+e.n+(e.team?' ('+e.team+')':''));
 const STORE='travian-rog-x2-highlighted';
 const checked=new Set((()=>{ try{ return JSON.parse(localStorage.getItem(STORE)||'[]').map(n=>nameIdx[n]).filter(r=>r!=null); }catch(e){ return []; } })());
 
@@ -420,7 +463,10 @@ function draw(){
       const fs=Math.max(9,Math.min(22, scale*Math.sqrt(area[r])/5.5));
       ctx.font=`600 ${fs}px system-ui`; const X=ox+(a.col+.5)*scale, Y=oy+(a.row+.5)*scale;
       ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,.8)'; ctx.strokeText(names[r],X,Y);
-      ctx.fillStyle= checked.has(r) ? '#f0c36a' : (checked.size ? 'rgba(255,255,255,.6)' : '#fff'); ctx.fillText(names[r],X,Y); }
+      ctx.fillStyle= checked.has(r) ? '#f0c36a' : (checked.size ? 'rgba(255,255,255,.6)' : '#fff'); ctx.fillText(names[r],X,Y);
+      const ol=ovRegions.get(r);
+      if (ol && fs>=10){ const f2=Math.max(9,fs*.62); ctx.font=`500 ${f2}px system-ui`; const t=ol.map(ovText).join(' / ');
+        ctx.strokeText(t,X,Y+fs*.6+f2*.6); ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillText(t,X,Y+fs*.6+f2*.6); } }
   }
   afterDraw();
 }
@@ -655,6 +701,7 @@ window.addEventListener('mousemove',e=>{
   tip.style.display='block';
   const v=vAt.get(t.row*N+t.col), rr = v && v[2]>=0 ? v[2] : t.r;
   let html=`(${t.x}|${t.y})  ${rr>=0?esc(names[rr]):'sea / outside all regions'}`;
+  if (rr>=0 && ovRegions.get(rr)) html+='\nPlan: '+ovRegions.get(rr).map(e=>esc(ovText(e))).join(' · ');
   if (v){ const st={normal:'Village',capital:'Capital',city:'City'}[vStatus(v)]+(v[8]&4?' · harbor':'');
     html+=`\n<b>${esc(v[4])}</b>  (${st})\nPlayer: ${esc(v[5])}${v[6]?`  [${esc(v[6])}]`:''}\nTribe: ${(TRIBES[v[3]]||['?'])[0]} · Population: ${v[7]}${v[9]>0?`\nVictory points: ${v[9]}`:''}`; }
   tip.innerHTML=html;
@@ -700,7 +747,7 @@ function setTab(t){
   document.getElementById('app').hidden=plans; document.getElementById('plans').hidden=!plans;
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
   if (location.hash !== (plans?'#plans':'') ) history.replaceState(null,'', plans ? '#plans' : location.pathname+location.search);
-  if (plans) renderPlans(); else { if (needFit||!(scale>0.5)) { fit(); needFit=false; } draw(); }
+  if (plans) renderPlans(); else { if (needFit||!(scale>0.5)) { fit(); needFit=false; } renderOverlayPanel(); paintBase(); draw(); }
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
@@ -763,7 +810,7 @@ async function loadPlan(keepDraft=true){
         pMsg('Someone saved the plans after your last unsaved edits, so those edits were dropped and you see the latest version.','warn'); }
     }
   } catch(e){ pMsg('Could not load the plans: '+esc(e.message),'err'); }
-  renderPlans();
+  renderPlans(); renderOverlayPanel(); if (main.clientWidth){ paintBase(); draw(); }
 }
 function changed(){
   try{ if (dirty()) localStorage.setItem(DRAFT_KEY, JSON.stringify({base:loadedText, alliances:plan.alliances}));
@@ -838,7 +885,7 @@ function renderPlans(){
   if (!plan.alliances.length){
     el.innerHTML = loadedText===null ? '' : `<div class="empty">No alliances in the plan yet.${ed?' Add one with the box above.':' Leaders can add them with Editor access.'}</div>`; return; }
   el.innerHTML = plan.alliances.map((a,ai)=>{
-    const info=allyByTag.get(a.tag), col=PAL[ai%PAL.length];
+    const info=allyByTag.get(a.tag), col=ovCss(ai,'settling');
     const teamOpts=sel=>'<option value="">— any team —</option>'+a.teams.map(t=>`<option${t.name===sel?' selected':''}>${esc(t.name)}</option>`).join('');
     let h=`<section class="pcard" data-ai="${ai}"><header><span class="sw" style="background:${col}"></span><h3>${esc(a.tag)}</h3>`+
       `<span class="note">${info?`${info.players.size} players · ${info.n} villages · ${fmt(info.pop)} pop · ${fmt(allyVP.get(a.tag)||0)} VP`:'not in today\'s map.sql (renamed or disbanded?)'}</span>`+
@@ -963,6 +1010,21 @@ document.getElementById('pTokSave').onclick=async()=>{
     pMsg('Editor access on. Changes are only shared once you press “Save for everyone”.','ok'); renderPlans();
   }catch(err){ note.textContent=err.message; }
 };
+function renderOverlayPanel(){
+  const el=document.getElementById('ovList');
+  if (!plan.alliances.length){ el.innerHTML='<div>No alliance plans yet. Add them in the <a href="#plans" style="color:var(--accent)">Alliance plans</a> tab.</div>'; document.getElementById('ovBadge').textContent=''; return; }
+  el.innerHTML=plan.alliances.map((a,ai)=>`<label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}>`+
+    `<span class="ovtri">${OV_ST.map(st=>`<i style="background:${ovCss(ai,st)}"></i>`).join('')}</span><span class="t">${esc(a.tag)}</span>`+
+    `<span>${a.taken.length} · ${a.teams.filter(t=>t.region).length} · ${a.planned.length}</span></label>`).join('')+
+    `<div class="bar"><span>taken · settling · planned</span><span><button id="ovAll">All</button> <button id="ovNone">None</button></span></div>`;
+  const shown=plan.alliances.filter(a=>!ovOff.has(a.tag)).length;
+  document.getElementById('ovBadge').textContent = shown ? `${shown} shown` : '';
+  el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ i.checked?ovOff.delete(i.dataset.tag):ovOff.add(i.dataset.tag); ovChanged(); });
+  document.getElementById('ovAll').onclick=()=>{ ovOff.clear(); ovChanged(); };
+  document.getElementById('ovNone').onclick=()=>{ plan.alliances.forEach(a=>ovOff.add(a.tag)); ovChanged(); };
+  el.querySelector('a')?.addEventListener('click',e=>{ e.preventDefault(); setTab('plans'); });
+}
+function ovChanged(){ try{ localStorage.setItem(OV_KEY, JSON.stringify([...ovOff])); }catch(e){} renderOverlayPanel(); paintBase(); draw(); }
 window.addEventListener('beforeunload',e=>{ if (dirty()){ e.preventDefault(); e.returnValue=''; } });
 
 fit(); allyChanged(); refresh();
