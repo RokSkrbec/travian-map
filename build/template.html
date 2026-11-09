@@ -73,7 +73,23 @@
   #tip { position:absolute; pointer-events:none; background:rgba(0,0,0,.85); padding:4px 8px; border-radius:4px; font-size:12px; display:none; white-space:pre; line-height:1.45; z-index:2; }
   #tip b { color:var(--accent); }
   #help { position:absolute; right:10px; bottom:10px; color:var(--muted); font-size:12px; background:rgba(0,0,0,.5); padding:4px 8px; border-radius:4px; }
-  #resBtn { position:absolute; right:10px; top:10px; padding:5px 10px; font-size:13px; z-index:1; }
+  #rbtns { position:absolute; right:10px; top:10px; display:flex; gap:6px; z-index:1; }
+  #rbtns button { padding:5px 10px; font-size:13px; }
+  #ap { width:390px; flex:none; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; }
+  #ap[hidden] { display:none; }
+  #ap .head { padding:10px 12px 8px; border-bottom:1px solid var(--line); }
+  #ap .head .bar { margin:0 0 4px; }
+  #ap .title { font-weight:600; }
+  #apList { flex:1; overflow:auto; padding:0 12px 24px; }
+  .apA { border-bottom:1px solid var(--line); padding:10px 0; }
+  .apA > label { display:flex; align-items:center; gap:8px; cursor:pointer; }
+  .apA > label b { font-size:15px; }
+  .apA .sub2 { color:var(--muted); font-size:12px; margin:2px 0 0 21px; }
+  .apSec { font-size:11px; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin:9px 0 3px; }
+  .aprow { display:grid; grid-template-columns:12px 1fr auto; gap:7px; align-items:center; font-size:12.5px; padding:2px 4px; border-radius:3px; cursor:pointer; }
+  .aprow:hover { background:#2a303a; }
+  .aprow i { width:12px; height:12px; border-radius:2px; }
+  .aprow .r { color:var(--muted); font-size:11.5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 
   /* results panel */
   #res { width:500px; flex:none; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; }
@@ -162,7 +178,7 @@
       <summary>Alliance plans overlay <span class="badge" id="ovBadge"></span></summary>
       <div class="body">
         <div id="ovList"></div>
-        <div class="ovleg"><span><i class="ovs" style="background:hsl(0,0%,30%)"></i>Taken</span><span><i class="ovs" style="background:hsl(0,0%,52%)"></i>Settling now</span><span><i class="ovs" style="background:hsl(0,0%,74%)"></i>Planned next</span></div>
+        <div class="ovleg"><span><i class="ovs" style="background:hsl(0,0%,27%)"></i>Taken</span><span><i class="ovs" style="background:hsl(0,0%,50%)"></i>Settling now</span><span><i class="ovs" style="background:hsl(0,0%,79%)"></i>Planned next</span></div>
         <div>Same colour per alliance: darkest = taken, middle = settling now, lightest = planned next. Stripes = region in several shown plans. Other regions turn grey.</div>
       </div>
     </details>
@@ -214,8 +230,15 @@
 <div id="main">
   <canvas id="cv"></canvas>
   <div id="tip"></div>
-  <button id="resBtn">☰ Players &amp; villages</button>
+  <div id="rbtns"><button id="apBtn">☰ Alliance plans</button><button id="resBtn">☰ Players &amp; villages</button></div>
   <div id="help">Scroll to zoom · drag to pan · click a region to highlight it · hover a village for details · gold ring = victory points (zoomed in)</div>
+</div>
+<div id="ap" hidden>
+  <div class="head">
+    <div class="bar"><span class="title">Alliance plans</span><button id="apClose" title="Close">✕</button></div>
+    <div class="note">Ticked alliances are coloured on the map. Click a region to go to it. Edit plans in the Alliance plans tab.</div>
+  </div>
+  <div id="apList"></div>
 </div>
 <div id="res" hidden>
   <div class="head">
@@ -377,7 +400,7 @@ function paintBase(){
     if (r<0){ img.data[o]=28; img.data[o+1]=46; img.data[o+2]=66; img.data[o+3]=255; continue; }
     if (ovOn){   // plan overlay: plan regions in alliance shades (diagonal stripes when shared), the rest grey
       const l=ovRegions.get(r), dim=checked.size && !checked.has(r);
-      if (!l){ const g=dim?48:58; img.data[o]=g; img.data[o+1]=g+2; img.data[o+2]=g+6; img.data[o+3]=255; continue; }
+      if (!l){ const g=dim?36:44; img.data[o]=g; img.data[o+1]=g+2; img.data[o+2]=g+6; img.data[o+3]=255; continue; }
       const e=l.length>1 ? l[Math.floor(((i/N|0)+i%N)/4)%l.length] : l[0], c=ovRgb[e.ai+e.st], f=dim?.5:1;
       img.data[o]=c[0]*f; img.data[o+1]=c[1]*f; img.data[o+2]=c[2]*f; img.data[o+3]=255; continue; }
     // Region colours off: plain grey land so village colours stand out (highlighted regions a bit lighter)
@@ -390,9 +413,9 @@ function paintBase(){
   bctx.putImageData(img,0,0);
 }
 // ---------- alliance plans overlay ----------
-const OV_HUES=[0,205,48,125,295,265,22,170,330,85,188,238];
+const OV_HUES=[0,215,52,135,300,185,28,265,340,95,200,15];   // far-apart hues first: red, blue, yellow, green, magenta, cyan, orange, violet
 const OV_ST=['taken','settling','planned'];
-const OV_L={taken:'32%',settling:'50%',planned:'72%'}, OV_S={taken:'62%',settling:'72%',planned:'55%'};
+const OV_L={taken:'27%',settling:'50%',planned:'79%'}, OV_S={taken:'78%',settling:'92%',planned:'88%'};
 const ovCss=(ai,st)=>`hsl(${OV_HUES[ai%OV_HUES.length]+(ai>=OV_HUES.length?15:0)},${OV_S[st]},${OV_L[st]})`;
 const OV_KEY='travian-rog-x2-overlay';
 let ovOff=new Set(); try{ ovOff=new Set(JSON.parse(localStorage.getItem(OV_KEY)||'[]')); }catch(e){}   // alliances the viewer unticked
@@ -604,13 +627,17 @@ document.querySelector('#resTable tbody').addEventListener('click',e=>{
 document.getElementById('resMore').onclick=()=>{ resLimit=1e9; renderResults(); };
 document.querySelectorAll('input[name=resTab]').forEach(r=>r.addEventListener('change',()=>{ resLimit=300; renderResults(); }));
 document.getElementById('resQ').addEventListener('input',()=>renderResults());
-function setResOpen(open){
+// right-hand panels: Players & villages ('res') or Alliance plans ('ap'), one at a time
+function setSidePanel(which){
   const cx=(main.clientWidth/2-ox)/scale;              // keep the same map point centred
-  document.getElementById('res').hidden=!open; document.getElementById('resBtn').hidden=open;
+  document.getElementById('res').hidden=which!=='res'; document.getElementById('resBtn').hidden=which==='res';
+  document.getElementById('ap').hidden=which!=='ap'; document.getElementById('apBtn').hidden=which==='ap';
   ox=main.clientWidth/2-cx*scale;
-  try{ localStorage.setItem('travian-rog-x2-list', open?'1':''); }catch(e){}
+  try{ localStorage.setItem('travian-rog-x2-list', which==='res'?'1':''); localStorage.setItem('travian-rog-x2-ap', which==='ap'?'1':''); }catch(e){}
+  if (which==='ap') renderApPanel();
   resSig=null; draw();
 }
+const setResOpen=open=>setSidePanel(open?'res':'');
 document.getElementById('resBtn').onclick=()=>setResOpen(true);
 document.getElementById('resClose').onclick=()=>{ focus=[]; setResOpen(false); };
 document.getElementById('resCopy').onclick=async e=>{
@@ -738,7 +765,8 @@ function toggle(r){ checked.has(r)?checked.delete(r):checked.add(r); refresh(); 
 document.getElementById('clearSel').onclick=()=>{ checked.clear(); refresh(); };
 document.getElementById('q').addEventListener('input',e=>{ const v=e.target.value, m=v.match(/^\s*\(?(-?\d+)\s*[|,\s]\s*(-?\d+)\)?\s*$/);
   if(m){ const x=+m[1], y=+m[2]; if(Math.abs(x)<=200&&Math.abs(y)<=200) centerOn(x-MIN,200-y); } else renderList(v); });
-try{ if (localStorage.getItem('travian-rog-x2-list')){ document.getElementById('res').hidden=false; document.getElementById('resBtn').hidden=true; } }catch(e){}
+try{ if (localStorage.getItem('travian-rog-x2-list')){ document.getElementById('res').hidden=false; document.getElementById('resBtn').hidden=true; }
+     else if (localStorage.getItem('travian-rog-x2-ap')){ document.getElementById('ap').hidden=false; document.getElementById('apBtn').hidden=true; } }catch(e){}
 
 // ---------- tabs ----------
 let needFit=false;
@@ -1012,7 +1040,7 @@ document.getElementById('pTokSave').onclick=async()=>{
 };
 function renderOverlayPanel(){
   const el=document.getElementById('ovList');
-  if (!plan.alliances.length){ el.innerHTML='<div>No alliance plans yet. Add them in the <a href="#plans" style="color:var(--accent)">Alliance plans</a> tab.</div>'; document.getElementById('ovBadge').textContent=''; return; }
+  if (!plan.alliances.length){ el.innerHTML='<div>No alliance plans yet. Add them in the <a href="#plans" style="color:var(--accent)">Alliance plans</a> tab.</div>'; document.getElementById('ovBadge').textContent=''; renderApPanel(); return; }
   el.innerHTML=plan.alliances.map((a,ai)=>`<label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}>`+
     `<span class="ovtri">${OV_ST.map(st=>`<i style="background:${ovCss(ai,st)}"></i>`).join('')}</span><span class="t">${esc(a.tag)}</span>`+
     `<span>${a.taken.length} · ${a.teams.filter(t=>t.region).length} · ${a.planned.length}</span></label>`).join('')+
@@ -1023,7 +1051,33 @@ function renderOverlayPanel(){
   document.getElementById('ovAll').onclick=()=>{ ovOff.clear(); ovChanged(); };
   document.getElementById('ovNone').onclick=()=>{ plan.alliances.forEach(a=>ovOff.add(a.tag)); ovChanged(); };
   el.querySelector('a')?.addEventListener('click',e=>{ e.preventDefault(); setTab('plans'); });
+  renderApPanel();
 }
+function renderApPanel(){
+  const el=document.getElementById('apList'); if (document.getElementById('ap').hidden) return;
+  if (!plan.alliances.length){ el.innerHTML='<div class="note" style="margin-top:12px">No alliance plans yet. Add them in the Alliance plans tab.</div>'; return; }
+  const row=(a,ai,st,rn,label)=>{ const r=nameIdx[rn]; if (r==null) return '';
+    const s=regStats[r], me=s.by.get(a.tag)||{n:0,pop:0,vp:0}, sh=s.pop?Math.round(100*me.pop/s.pop):0; let rv=null;
+    for (const [t,x] of s.by) if (t && t!==a.tag && (!rv||x.pop>rv.pop)) rv={tag:t,...x};
+    const tip=`${rn}: ${a.tag} has ${me.n} of ${s.n} villages, ${fmt(me.pop)} of ${fmt(s.pop)} pop (${sh}%)${me.vp?`, ${fmt(me.vp)} VP`:''}`+(rv?`\nStrongest other alliance: ${rv.tag} (${rv.n} villages, ${fmt(rv.pop)} pop)`:'');
+    return `<div class="aprow" data-r="${r}" title="${esc(tip)}"><i style="background:${ovCss(ai,st)}"></i><span>${label}</span><span class="r">${sh}% · ${me.n}/${s.n} vill.</span></div>`; };
+  el.innerHTML=plan.alliances.map((a,ai)=>{
+    const info=allyByTag.get(a.tag);
+    let h=`<div class="apA"><label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}><span class="ovtri">${OV_ST.map(st=>`<i style="background:${ovCss(ai,st)}"></i>`).join('')}</span><b>${esc(a.tag)}</b></label>`+
+      `<div class="sub2">${info?`${info.players.size} players · ${info.n} villages · ${fmt(info.pop)} pop · ${fmt(allyVP.get(a.tag)||0)} VP`:'not in today\'s map.sql'}</div>`;
+    const set=a.teams.filter(t=>t.region);
+    if (set.length) h+='<div class="apSec">Settling now</div>'+set.map(t=>row(a,ai,'settling',t.region,`${esc(t.region)} <span class="note">· ${esc(t.name)}</span>`)).join('');
+    if (a.taken.length) h+=`<div class="apSec">Taken (${a.taken.length})</div>`+a.taken.map(rn=>row(a,ai,'taken',rn,esc(rn))).join('');
+    if (a.planned.length) h+='<div class="apSec">Planned next</div>'+a.planned.map((p,i)=>row(a,ai,'planned',p.region,`${i+1}. ${esc(p.region)}${p.team?` <span class="note">· ${esc(p.team)}</span>`:''}`)).join('');
+    if (a.notes) h+=`<div class="apSec">Notes</div><div class="pnotesv" style="font-size:12.5px">${esc(a.notes)}</div>`;
+    if (!set.length && !a.taken.length && !a.planned.length) h+='<div class="note" style="margin-top:6px">No regions in this plan yet.</div>';
+    return h+'</div>';
+  }).join('')+'<div class="note" style="margin-top:8px">Numbers: this alliance\'s share of the region\'s population · its villages / all villages there.</div>';
+  el.querySelectorAll('input[data-tag]').forEach(i=>i.onchange=()=>{ i.checked?ovOff.delete(i.dataset.tag):ovOff.add(i.dataset.tag); ovChanged(); });
+  el.querySelectorAll('.aprow').forEach(d=>d.onclick=()=>{ const a=anchor[+d.dataset.r]; if (a) centerOn(a.col,a.row); });
+}
+document.getElementById('apBtn').onclick=()=>setSidePanel('ap');
+document.getElementById('apClose').onclick=()=>setSidePanel('');
 function ovChanged(){ try{ localStorage.setItem(OV_KEY, JSON.stringify([...ovOff])); }catch(e){} renderOverlayPanel(); paintBase(); draw(); }
 window.addEventListener('beforeunload',e=>{ if (dirty()){ e.preventDefault(); e.returnValue=''; } });
 
