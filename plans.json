@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09T18:37:58.988Z",
+  "updated": "2026-11-09T18:49:04.806Z",
   "alliances": [
     {
       "tag": "B.U.",
@@ -21,8 +21,7 @@
         "Philippopolis",
         "Brundisium",
         "Ravenna",
-        "Syracusae",
-        "Alexandria"
+        "Syracusae"
       ],
       "planned": [],
       "notes": ""
@@ -41,8 +40,6 @@
       ],
       "taken": [
         "Pisae",
-        "Ulpiana",
-        "Teutones",
         "Paraitonion"
       ],
       "planned": [],
