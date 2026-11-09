@@ -12,6 +12,7 @@
   /* top bar with tabs */
   #top { flex:none; display:flex; align-items:stretch; gap:18px; padding:0 14px; height:40px; background:var(--panel); border-bottom:1px solid var(--line); }
   #top h1 { font-size:15px; margin:0; align-self:center; white-space:nowrap; }
+  #copyLink { margin-left:auto; align-self:center; padding:4px 10px; }
   .tabs { display:flex; gap:2px; }
   .tabs button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; padding:0 12px; font-size:13px; color:var(--muted); }
   .tabs button:hover { color:var(--text); }
@@ -167,6 +168,7 @@
 <div id="top">
   <h1>Ancient Europe regions</h1>
   <nav class="tabs"><button data-tab="map" class="on">Map</button><button data-tab="plans">Alliance plans</button></nav>
+  <button id="copyLink" title="Copy a link to exactly this view: position, zoom, filters, highlighted regions, overlay and open panel">🔗 Copy link</button>
 </div>
 <div id="app">
 <div id="side">
@@ -509,7 +511,7 @@ function draw(){
       if (ol && fs>=10){ const f2=Math.max(9,fs*.62); ctx.font=`500 ${f2}px system-ui`; const t=ol.map(ovText).join(' / ');
         ctx.strokeText(t,X,Y+fs*.6+f2*.6); ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillText(t,X,Y+fs*.6+f2*.6); } }
   }
-  afterDraw();
+  afterDraw(); captureView(); syncUrlSoon();
 }
 // ---------- villages ----------
 const tribeOn = new Set(Object.keys(TRIBES).map(Number));
@@ -792,8 +794,8 @@ function setTab(t){
   const plans = t==='plans';
   document.getElementById('app').hidden=plans; document.getElementById('plans').hidden=!plans;
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
-  if (location.hash !== (plans?'#plans':'') ) history.replaceState(null,'', plans ? '#plans' : location.pathname+location.search);
-  if (plans) renderPlans(); else { if (needFit||!(scale>0.5)) { fit(); needFit=false; } renderOverlayPanel(); paintBase(); draw(); }
+  if (location.hash !== (plans?'#plans':'') ) history.replaceState(null,'', plans ? location.pathname+location.search+'#plans' : location.pathname+location.search);
+  if (plans) renderPlans(); else { if (needFit||!(scale>0.5)) { fit(); needFit=false; } applyView(); renderOverlayPanel(); paintBase(); draw(); }
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
@@ -1144,9 +1146,68 @@ document.getElementById('apClose').onclick=()=>setSidePanel('');
 function ovChanged(){ try{ localStorage.setItem(OV_KEY, JSON.stringify([...ovOff])); }catch(e){} renderOverlayPanel(); paintBase(); draw(); }
 window.addEventListener('beforeunload',e=>{ if (dirty()){ e.preventDefault(); e.returnValue=''; } });
 
-fit(); allyChanged(); refresh();
+// ---------- shareable links: map settings live in the URL's query string ----------
+// Only settings that differ from the defaults are written. A link with any of these parameters
+// replaces the settings saved in the browser; a plain link keeps them.
+const URL_OPTS={labels:'optLabels',borders:'optBorders',grid:'optGrid',tiles:'optTiles',villages:'optVillages',colors:'optColors',mute:'optMute',
+  normal:'stNormal',capital:'stCapital',city:'stCity',vp:'optVP',insel:'optInSel'};
+const URL_KEYS=['v','o','by','r','t','p','pop','a','hide','panel','list'];
+let pendingView=null, lastView=null, urlTimer=0;
+function urlState(){
+  const q=new URLSearchParams();
+  if (lastView) q.set('v',lastView);
+  const tog=Object.entries(URL_OPTS).filter(([,id])=>document.getElementById(id).checked!==document.getElementById(id).defaultChecked).map(([k])=>k);
+  if (tog.length) q.set('o',tog.join(','));
+  if (document.querySelector('input[name=colorBy]:checked').value!=='tribe') q.set('by','ally');
+  if (checked.size) q.set('r',[...checked].map(r=>names[r]).sort().join(','));
+  if (tribeOn.size!==Object.keys(TRIBES).length) q.set('t',[...tribeOn].sort().join(',')||'none');
+  const who=document.getElementById('who').value.trim(); if (who) q.set('p',who);
+  if (+document.getElementById('minPop').value>0) q.set('pop',document.getElementById('minPop').value);
+  for (const tg of allyOn) q.append('a',tg);
+  for (const tg of ovOff) q.append('hide',tg);
+  const panel=!document.getElementById('res').hidden?'res':!document.getElementById('ap').hidden?'ap':''; if (panel) q.set('panel',panel);
+  if (panel==='res' && resTab()!=='players') q.set('list',resTab());
+  return q.toString().replace(/%2C/g,',').replace(/%7C/g,'|');
+}
+// remember the map centre (as x|y) and zoom whenever the map is drawn
+function captureView(){ const w=main.clientWidth, h=main.clientHeight; if (!w) return;
+  lastView=`${Math.round((w/2-ox)/scale+MIN-.5)},${Math.round(200-((h/2-oy)/scale-.5))},${+scale.toFixed(2)}`; }
+function syncUrl(){ const qs=urlState(), url=location.pathname+(qs?'?'+qs:'')+location.hash;
+  if (url!==location.pathname+location.search+location.hash) history.replaceState(null,'',url); }
+function syncUrlSoon(){ clearTimeout(urlTimer); urlTimer=setTimeout(syncUrl,250); }
+function applyUrl(){
+  const q=new URLSearchParams(location.search); if (!URL_KEYS.some(k=>q.has(k))) return false;
+  const tog=new Set((q.get('o')||'').split(',').filter(Boolean));
+  for (const [k,id] of Object.entries(URL_OPTS)){ const el=document.getElementById(id); el.checked = tog.has(k) ? !el.defaultChecked : el.defaultChecked; }
+  document.querySelector(`input[name=colorBy][value=${q.get('by')==='ally'?'ally':'tribe'}]`).checked=true;
+  checked.clear(); for (const n of (q.get('r')||'').split(',')) if (n in nameIdx) checked.add(nameIdx[n]);
+  tribeOn.clear(); const ts=q.get('t'); for (const id of Object.keys(TRIBES)) if (!ts || ts.split(',').includes(id)) tribeOn.add(+id);
+  document.querySelectorAll('#tribeF input').forEach((el,i)=>el.checked=tribeOn.has(+Object.keys(TRIBES)[i]));
+  document.getElementById('who').value=q.get('p')||''; document.getElementById('minPop').value=q.get('pop')||0;
+  allyOn.clear(); for (const tg of q.getAll('a')) if (allyRank.has(tg)) allyOn.add(tg);
+  ovOff=new Set(q.getAll('hide')); try{ localStorage.setItem(OV_KEY, JSON.stringify([...ovOff])); }catch(e){}
+  const v=(q.get('v')||'').split(',').map(Number);
+  if (v.length===3 && v.every(Number.isFinite)) pendingView={x:v[0],y:v[1],z:Math.min(40,Math.max(0.8,v[2]))};
+  if (q.get('list')==='villages') document.querySelector('input[name=resTab][value=villages]').checked=true;
+  const panel=q.get('panel'), set=(id,on)=>{ document.getElementById(id).hidden=!on; document.getElementById(id==='res'?'resBtn':'apBtn').hidden=on; };
+  set('res',panel==='res'); set('ap',panel==='ap');
+  try{ localStorage.setItem('travian-rog-x2-list', panel==='res'?'1':''); localStorage.setItem('travian-rog-x2-ap', panel==='ap'?'1':''); }catch(e){}
+  return true;
+}
+function applyView(){ if (!pendingView || !main.clientWidth) return; const {x,y,z}=pendingView; pendingView=null;
+  scale=z; ox=main.clientWidth/2-(x-MIN+.5)*scale; oy=main.clientHeight/2-(200-y+.5)*scale; }
+document.getElementById('copyLink').onclick=async e=>{
+  syncUrl(); const btn=e.currentTarget, old=btn.textContent;
+  try{ await navigator.clipboard.writeText(location.href); btn.textContent='✓ Link copied'; }
+  catch(_){ window.prompt('Copy this link:', location.href); }
+  setTimeout(()=>btn.textContent=old,1600);
+};
+document.querySelectorAll('input[name=resTab]').forEach(r=>r.addEventListener('change',syncUrlSoon));
+
+applyUrl();
+fit(); applyView(); allyChanged(); refresh();
 loadPlan();
-if (location.hash==='#plans'){ needFit=true; setTab('plans'); }
+if (location.hash==='#plans') setTab('plans');   // the map was already sized above, so no re-fit is needed later
 </script>
 </body>
 </html>
