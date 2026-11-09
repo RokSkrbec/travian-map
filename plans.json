@@ -1,8 +1,9 @@
 {
-  "updated": "2026-11-09T18:49:04.806Z",
+  "updated": "2026-11-09T19:20:22.605Z",
   "alliances": [
     {
       "tag": "B.U.",
+      "kind": "friend",
       "teams": [
         {
           "name": "Delphi",
@@ -28,6 +29,7 @@
     },
     {
       "tag": "BUPhx",
+      "kind": "friend",
       "teams": [
         {
           "name": "Delphi",
@@ -47,6 +49,7 @@
     },
     {
       "tag": "BU-UN",
+      "kind": "friend",
       "teams": [],
       "taken": [
         "Durnonovaria",
@@ -56,6 +59,82 @@
         "Bagacum",
         "Memphis",
         "Augustodunum"
+      ],
+      "planned": [],
+      "notes": ""
+    },
+    {
+      "tag": "NEFES",
+      "kind": "enemy",
+      "teams": [],
+      "taken": [
+        "Segestica",
+        "Thebes",
+        "Marcomanni",
+        "Mursa",
+        "Ancyra",
+        "Vandali",
+        "Tyras",
+        "Hyperborea",
+        "Delphi",
+        "Bastarnae"
+      ],
+      "planned": [],
+      "notes": ""
+    },
+    {
+      "tag": "NnFn",
+      "kind": "enemy",
+      "teams": [],
+      "taken": [
+        "Tolosa",
+        "Narbo",
+        "Emporiae",
+        "Caledonia",
+        "Burdigala",
+        "Nemausus",
+        "Mediolanum",
+        "Pictavium",
+        "Berzobis",
+        "Londinium",
+        "Corinium",
+        "Massalia",
+        "Augustodunum",
+        "Durnonovaria",
+        "Eburacum",
+        "Hibernia",
+        "Lutetia"
+      ],
+      "planned": [],
+      "notes": ""
+    },
+    {
+      "tag": "C&D",
+      "kind": "enemy",
+      "teams": [],
+      "taken": [
+        "Tarraco",
+        "Hippo Regius",
+        "Caralis",
+        "Numantia",
+        "Rusicadae",
+        "Hispalis",
+        "Jerusalem",
+        "Segovia",
+        "Olisipo",
+        "Alalie",
+        "Memphis",
+        "Saguntum",
+        "Emerita Augusta",
+        "Carthago Nova",
+        "Girba",
+        "Salona",
+        "Volubilis",
+        "Rusadir",
+        "Petra",
+        "Corduba",
+        "Alexandria",
+        "Caesarea"
       ],
       "planned": [],
       "notes": ""
