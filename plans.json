@@ -1,0 +1,30 @@
+{
+  "updated": "2026-11-09T18:20:13.282Z",
+  "alliances": [
+    {
+      "tag": "B.U.",
+      "teams": [
+        {
+          "name": "Delphi",
+          "region": "Alexandria"
+        },
+        {
+          "name": "Bagacum",
+          "region": "Alexandria"
+        }
+      ],
+      "taken": [
+        "Cherusci",
+        "Castra Regina",
+        "Delphi",
+        "Sparta",
+        "Philippopolis",
+        "Brundisium",
+        "Ravenna",
+        "Syracusae"
+      ],
+      "planned": [],
+      "notes": ""
+    }
+  ]
+}
