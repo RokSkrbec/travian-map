@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09T18:20:13.282Z",
+  "updated": "2026-11-09T18:36:37.195Z",
   "alliances": [
     {
       "tag": "B.U.",
@@ -21,7 +21,29 @@
         "Philippopolis",
         "Brundisium",
         "Ravenna",
-        "Syracusae"
+        "Syracusae",
+        "Alexandria"
+      ],
+      "planned": [],
+      "notes": ""
+    },
+    {
+      "tag": "BUPhx",
+      "teams": [
+        {
+          "name": "Delphi",
+          "region": "Ulpiana"
+        },
+        {
+          "name": "Cheruschi",
+          "region": "Teutones"
+        }
+      ],
+      "taken": [
+        "Pisae",
+        "Ulpiana",
+        "Teutones",
+        "Paraitonion"
       ],
       "planned": [],
       "notes": ""
