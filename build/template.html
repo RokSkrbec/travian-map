@@ -154,6 +154,12 @@
   .shb i { display:block; height:100%; background:var(--accent); }
   textarea.pnotes { width:100%; min-height:54px; background:#111419; color:var(--text); border:1px solid #333a45; border-radius:4px; font:inherit; font-size:13px; padding:6px 8px; resize:vertical; }
   .pnotesv { white-space:pre-wrap; font-size:13px; }
+  .psec { margin:26px 0 0; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  .pcard.enemy { border-color:#5a2a2a; }
+  .etag { font-size:11px; color:#ff8a80; border:1px solid #7a3434; border-radius:3px; padding:0 5px; text-transform:uppercase; letter-spacing:.05em; }
+  .ovh { display:flex; justify-content:space-between; color:var(--accent); font-size:11px; text-transform:uppercase; letter-spacing:.05em; margin:8px 0 2px; }
+  .ovh span { color:var(--muted); text-transform:none; letter-spacing:0; }
+  .apH { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:14px 0 0; }
   .empty { margin:30px 0; color:var(--muted); text-align:center; }
 </style>
 </head>
@@ -178,8 +184,8 @@
       <summary>Alliance plans overlay <span class="badge" id="ovBadge"></span></summary>
       <div class="body">
         <div id="ovList"></div>
-        <div class="ovleg"><span><i class="ovs" style="background:hsl(0,0%,27%)"></i>Taken</span><span><i class="ovs" style="background:hsl(0,0%,50%)"></i>Settling now</span><span><i class="ovs" style="background:hsl(0,0%,79%)"></i>Planned next</span></div>
-        <div>Same colour per alliance: darkest = taken, middle = settling now, lightest = planned next. Stripes = region in several shown plans. Other regions turn grey.</div>
+        <div class="ovleg"><span><i class="ovs" style="background:hsl(0,0%,27%)"></i>Taken</span><span><i class="ovs" style="background:hsl(0,0%,50%)"></i>Settling now</span><span><i class="ovs" style="background:hsl(0,0%,79%)"></i>Planned next</span><span><i class="ovs" style="background:repeating-linear-gradient(135deg,hsl(0,0%,50%) 0 3px,rgba(0,0,0,.65) 3px 4.5px)"></i>Enemy-held</span></div>
+        <div>Same colour per alliance: darkest = taken, middle = settling now, lightest = planned next. Enemy alliances are hatched with thin dark lines. Wide stripes = region in several shown plans. Other regions turn grey.</div>
       </div>
     </details>
     <details class="panel" data-k="display">
@@ -261,6 +267,7 @@
       <span class="note" id="pStatus"></span>
       <div class="pbtns">
         <span id="pEdit" style="display:contents">
+          <select id="pAddKind" title="Friendly: full plan with teams. Enemy: list of regions they hold, prefilled from map.sql."><option value="friend">Friendly</option><option value="enemy">Enemy</option></select>
           <input type="text" id="pAddAlly" list="allyDL" placeholder="Add alliance (tag)…">
           <button id="pAddBtn">Add</button>
           <button id="pDiscard" disabled>Discard changes</button>
@@ -401,7 +408,8 @@ function paintBase(){
     if (ovOn){   // plan overlay: plan regions in alliance shades (diagonal stripes when shared), the rest grey
       const l=ovRegions.get(r), dim=checked.size && !checked.has(r);
       if (!l){ const g=dim?36:44; img.data[o]=g; img.data[o+1]=g+2; img.data[o+2]=g+6; img.data[o+3]=255; continue; }
-      const e=l.length>1 ? l[Math.floor(((i/N|0)+i%N)/4)%l.length] : l[0], c=ovRgb[e.ai+e.st], f=dim?.5:1;
+      const row=i/N|0, col=i%N, e=l.length>1 ? l[Math.floor((row+col)/4)%l.length] : l[0], c=ovRgb[e.ai+e.st];
+      let f=dim?.5:1; if (e.st==='enemy' && ((row-col)%5+5)%5===0) f*=.3;   // enemy: dark hatching
       img.data[o]=c[0]*f; img.data[o+1]=c[1]*f; img.data[o+2]=c[2]*f; img.data[o+3]=255; continue; }
     // Region colours off: plain grey land so village colours stand out (highlighted regions a bit lighter)
     if (!opt('optColors')){ const g = checked.size && checked.has(r) ? 92 : 58;
@@ -415,7 +423,9 @@ function paintBase(){
 // ---------- alliance plans overlay ----------
 const OV_HUES=[0,215,52,135,300,185,28,265,340,95,200,15];   // far-apart hues first: red, blue, yellow, green, magenta, cyan, orange, violet
 const OV_ST=['taken','settling','planned'];
-const OV_L={taken:'27%',settling:'50%',planned:'79%'}, OV_S={taken:'78%',settling:'92%',planned:'88%'};
+const OV_L={taken:'27%',settling:'50%',planned:'79%',enemy:'47%'}, OV_S={taken:'78%',settling:'92%',planned:'88%',enemy:'85%'};
+// swatch background; enemy-held regions are hatched with dark diagonal lines (like on the map)
+const ovSw=(ai,st)=>st==='enemy' ? `repeating-linear-gradient(135deg,${ovCss(ai,st)} 0 3px,rgba(0,0,0,.65) 3px 4.5px)` : ovCss(ai,st);
 const ovCss=(ai,st)=>`hsl(${OV_HUES[ai%OV_HUES.length]+(ai>=OV_HUES.length?15:0)},${OV_S[st]},${OV_L[st]})`;
 const OV_KEY='travian-rog-x2-overlay';
 let ovOff=new Set(); try{ ovOff=new Set(JSON.parse(localStorage.getItem(OV_KEY)||'[]')); }catch(e){}   // alliances the viewer unticked
@@ -426,6 +436,7 @@ function overlayRegions(){
     const put=(rn,st,extra)=>{ const r=nameIdx[rn]; if (r==null) return; let l=m.get(r); if(!l){ l=[]; m.set(r,l); }
       const e=l.find(x=>x.ai===ai);
       if (!e) l.push({ai,tag:a.tag,st,...extra}); else if (OV_ST.indexOf(st)<OV_ST.indexOf(e.st)) Object.assign(e,{st,...extra}); else if (st==='settling'&&e.st==='settling') e.team+=', '+extra.team; };
+    if (a.kind==='enemy'){ a.taken.forEach(rn=>put(rn,'enemy',{})); return; }
     a.taken.forEach(rn=>put(rn,'taken',{}));
     a.teams.forEach(t=>put(t.region,'settling',{team:t.name}));
     a.planned.forEach((p,i)=>put(p.region,'planned',{n:i+1, team:p.team}));
@@ -433,7 +444,7 @@ function overlayRegions(){
   return m;
 }
 let ovRegions=new Map();
-const ovText=e=>e.tag+': '+(e.st==='taken'?'taken':e.st==='settling'?'settling'+(e.team?' ('+e.team+')':''):'planned #'+e.n+(e.team?' ('+e.team+')':''));
+const ovText=e=>e.tag+': '+(e.st==='enemy'?'enemy-held':e.st==='taken'?'taken':e.st==='settling'?'settling'+(e.team?' ('+e.team+')':''):'planned #'+e.n+(e.team?' ('+e.team+')':''));
 const STORE='travian-rog-x2-highlighted';
 const checked=new Set((()=>{ try{ return JSON.parse(localStorage.getItem(STORE)||'[]').map(n=>nameIdx[n]).filter(r=>r!=null); }catch(e){ return []; } })());
 
@@ -801,7 +812,7 @@ const dirty=()=>loadedText!==null && sig()!==savedSig;
 function normPlan(p){
   const out={updated:p&&p.updated||'', alliances:[]};
   for (const a of (p&&Array.isArray(p.alliances)?p.alliances:[])) out.alliances.push({
-    tag:String(a.tag||''),
+    tag:String(a.tag||''), kind:a.kind==='enemy'?'enemy':'friend',
     teams:(a.teams||[]).map(t=>({name:String(t.name||''), region:String(t.region||'')})),
     taken:(a.taken||[]).map(String),
     planned:(a.planned||[]).map(x=>({region:String(x.region||''), team:String(x.team||'')})),
@@ -874,17 +885,27 @@ async function savePlan(force=false){
   renderPlans();
 }
 
+// Best guess at the regions an alliance holds, from map.sql alone: regions where it has the most
+// population of any alliance and at least 3 villages. map.sql can't show real control, so leaders edit this.
+function suggestHeld(tag){
+  const out=[];
+  regStats.forEach((s,r)=>{ const me=s.by.get(tag); if (!me || me.n<3) return;
+    for (const [t,x] of s.by) if (t && t!==tag && x.pop>me.pop) return;
+    out.push([names[r], me.pop/s.pop]); });
+  return out.sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+}
 // which alliances mention each region, for clash warnings
 function planIndex(){
   const m=new Map(), add=(rn,tag,st)=>{ if(!rn) return; if(!m.has(rn)) m.set(rn,[]); m.get(rn).push({tag,st}); };
   for (const a of plan.alliances){
+    if (a.kind==='enemy'){ for (const r of a.taken) add(r,a.tag,'enemy, holds'); continue; }
     for (const r of a.taken) add(r,a.tag,'taken');
     for (const t of a.teams) add(t.region,a.tag,'settling'+(t.name?' · '+t.name:''));
     a.planned.forEach((p,i)=>add(p.region,a.tag,'planned #'+(i+1)));
   }
   return m;
 }
-const STAT_TH='<th class="num" title="Villages of this alliance / all villages in the region">Villages</th><th class="num">Our pop.</th><th class="num">Our VP</th><th title="This alliance\'s share of the region\'s population">Pop. share</th><th>Strongest other alliance</th><th>Also in plans of</th>';
+const statTh=(w='Our')=>'<th class="num" title="Villages of this alliance / all villages in the region">Villages</th><th class="num">'+w+' pop.</th><th class="num">'+w+' VP</th><th title="This alliance\'s share of the region\'s population">Pop. share</th><th>Strongest other alliance</th><th>Also in plans of</th>', STAT_TH=statTh();
 function statCells(tag,rn,idx){
   const r=nameIdx[rn]; if (r==null) return '<td colspan="6"></td>';
   const s=regStats[r], me=s.by.get(tag)||{n:0,pop:0,vp:0}, sh=s.pop?me.pop/s.pop:0; let rv=null;
@@ -912,13 +933,35 @@ function renderPlans(){
   const el=document.getElementById('pList');
   if (!plan.alliances.length){
     el.innerHTML = loadedText===null ? '' : `<div class="empty">No alliances in the plan yet.${ed?' Add one with the box above.':' Leaders can add them with Editor access.'}</div>`; return; }
-  el.innerHTML = plan.alliances.map((a,ai)=>{
-    const info=allyByTag.get(a.tag), col=ovCss(ai,'settling');
+  const card=(a,ai)=>a.kind==='enemy' ? enemyCard(a,ai,ed,idx) : friendCard(a,ai,ed,idx);
+  const fr=plan.alliances.map((a,ai)=>[a,ai]).filter(([a])=>a.kind!=='enemy'), en=plan.alliances.map((a,ai)=>[a,ai]).filter(([a])=>a.kind==='enemy');
+  el.innerHTML = (fr.length?'<h3 class="psec">Friendly alliances</h3>'+fr.map(x=>card(...x)).join(''):'') +
+                 (en.length?'<h3 class="psec">Enemy alliances</h3>'+en.map(x=>card(...x)).join(''):'');
+}
+function cardHeader(a,ai,ed){
+  const info=allyByTag.get(a.tag), same=plan.alliances.map((x,j)=>[x,j]).filter(([x])=>x.kind===a.kind).map(([,j])=>j), k=same.indexOf(ai);
+  return `<section class="pcard${a.kind==='enemy'?' enemy':''}" data-ai="${ai}"><header><span class="sw" style="background:${ovSw(ai,a.kind==='enemy'?'enemy':'settling')}"></span><h3>${esc(a.tag)}</h3>${a.kind==='enemy'?'<span class="etag">enemy</span>':''}`+
+    `<span class="note">${info?`${info.players.size} players · ${info.n} villages · ${fmt(info.pop)} pop · ${fmt(allyVP.get(a.tag)||0)} VP`:'not in today\'s map.sql (renamed or disbanded?)'}</span>`+
+    (ed?`<span class="sp">${k>0?`<button data-act="aMove" data-to="${same[k-1]}" title="Move up">↑</button>`:''}${k<same.length-1?`<button data-act="aMove" data-to="${same[k+1]}" title="Move down">↓</button>`:''}`+
+      `<button data-act="kind" title="Switch between friendly and enemy">${a.kind==='enemy'?'Make friendly':'Make enemy'}</button>`+
+      `<button data-act="delAlly">${confirmDel===ai?'Click again to remove':'Remove alliance'}</button></span>`:'')+`</header>`;
+}
+function enemyCard(a,ai,ed,idx){
+  let h=cardHeader(a,ai,ed);
+  h+=`<h4>Regions they hold <span class="note">prefilled where they have the most population (3+ villages); map.sql can't show real control, so edit as needed</span></h4>`;
+  h+= a.taken.length ? `<div class="tw"><table class="ptab"><tr><th>Region</th>${statTh('Their')}${ed?'<th></th>':''}</tr>`+
+    a.taken.map((rn,i)=>`<tr><td>${rlink(rn)}</td>${statCells(a.tag,rn,idx)}${ed?`<td class="act"><button data-act="delTaken" data-i="${i}" title="Remove">✕</button></td>`:''}</tr>`).join('')+`</table></div>`
+    : `<div class="note">None listed.</div>`;
+  if (ed){ const miss=suggestHeld(a.tag).filter(r=>!a.taken.includes(r));
+    h+=`<div class="bar" style="justify-content:flex-start"><select data-act="addTaken">${regOptions('').replace('— choose region —','+ Add region they hold…')}</select>`+
+      (miss.length?`<button data-act="suggest" title="${esc(miss.join(', '))}">Add ${miss.length} more suggested from map.sql</button>`:'')+`</div>`; }
+  h+=`<h4>Notes</h4>`+(ed?`<textarea class="pnotes" data-act="notes" placeholder="Strength, activity, diplomacy…">${esc(a.notes)}</textarea>`
+    : (a.notes?`<div class="pnotesv">${esc(a.notes)}</div>`:'<div class="note">—</div>'));
+  return h+'</section>';
+}
+function friendCard(a,ai,ed,idx){ {
     const teamOpts=sel=>'<option value="">— any team —</option>'+a.teams.map(t=>`<option${t.name===sel?' selected':''}>${esc(t.name)}</option>`).join('');
-    let h=`<section class="pcard" data-ai="${ai}"><header><span class="sw" style="background:${col}"></span><h3>${esc(a.tag)}</h3>`+
-      `<span class="note">${info?`${info.players.size} players · ${info.n} villages · ${fmt(info.pop)} pop · ${fmt(allyVP.get(a.tag)||0)} VP`:'not in today\'s map.sql (renamed or disbanded?)'}</span>`+
-      (ed?`<span class="sp">${ai>0?'<button data-act="aUp" title="Move up">↑</button>':''}${ai<plan.alliances.length-1?'<button data-act="aDown" title="Move down">↓</button>':''}`+
-        `<button data-act="delAlly">${confirmDel===ai?'Click again to remove':'Remove alliance'}</button></span>`:'')+`</header>`;
+    let h=cardHeader(a,ai,ed);
     // teams
     h+=`<h4>Teams</h4><div class="chips">`+(a.teams.length||ed?'':'<span class="note">No teams.</span>')+
       a.teams.map((t,ti)=> ed ? `<span class="chip"><input type="text" data-act="teamName" data-i="${ti}" value="${esc(t.name)}" size="${Math.max(4,t.name.length)}" title="Rename team"><button data-act="delTeam" data-i="${ti}" title="Remove team">✕</button></span>`
@@ -946,7 +989,7 @@ function renderPlans(){
     h+=`<h4>Notes</h4>`+(ed?`<textarea class="pnotes" data-act="notes" placeholder="Anything the teams should know">${esc(a.notes)}</textarea>`
       : (a.notes?`<div class="pnotesv">${esc(a.notes)}</div>`:'<div class="note">—</div>'));
     return h+'</section>';
-  }).join('');
+  }
 }
 
 // editing (all through event delegation on the list)
@@ -961,8 +1004,9 @@ pList.addEventListener('click',e=>{
   const c=ctxOf({target:t}); if(!c) return; const {a,ai,i}=c;
   switch(t.dataset.act){
     case 'delAlly': if (confirmDel!==ai){ confirmDel=ai; renderPlans(); return; } plan.alliances.splice(ai,1); break;
-    case 'aUp': swap(plan.alliances,ai,ai-1); break;
-    case 'aDown': swap(plan.alliances,ai,ai+1); break;
+    case 'aMove': swap(plan.alliances,ai,+t.dataset.to); break;
+    case 'kind': a.kind = a.kind==='enemy'?'friend':'enemy'; if (a.kind==='enemy' && !a.taken.length) a.taken=suggestHeld(a.tag); break;
+    case 'suggest': for (const r of suggestHeld(a.tag)) if (!a.taken.includes(r)) a.taken.push(r); break;
     case 'addTeam': { const inp=t.parentElement.querySelector('.newteam'), n=inp.value.trim();
       if (!n || a.teams.some(x=>x.name.toLowerCase()===n.toLowerCase())) { inp.focus(); return; } a.teams.push({name:n,region:''}); break; }
     case 'delTeam': { const n=a.teams[i].name; a.teams.splice(i,1); a.planned.forEach(p=>{ if(p.team===n) p.team=''; }); break; }
@@ -997,7 +1041,9 @@ document.getElementById('pAddBtn').onclick=()=>{
   const real=allies.find(x=>x.tag && x.tag.toLowerCase()===tag.toLowerCase());
   if (!real){ pMsg(tag?`No alliance tagged “${esc(tag)}” in today's map.sql.`:'Type an alliance tag first.','err'); return; }
   if (plan.alliances.some(x=>x.tag===real.tag)){ pMsg(`${esc(real.tag)} is already in the plan.`,'warn'); return; }
-  plan.alliances.push({tag:real.tag, teams:[], taken:[], planned:[], notes:''}); inp.value=''; pMsg(''); changed();
+  const kind=document.getElementById('pAddKind').value, held=kind==='enemy'?suggestHeld(real.tag):[];
+  plan.alliances.push({tag:real.tag, kind, teams:[], taken:held, planned:[], notes:''}); inp.value='';
+  pMsg(kind==='enemy' ? `Added enemy ${esc(real.tag)} with ${held.length} region${held.length===1?'':'s'} where it has the most population (3+ villages). map.sql can't show real control, so check the list.` : ''); changed();
 };
 document.getElementById('pAddAlly').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('pAddBtn').click(); });
 document.getElementById('pSave').onclick=()=>savePlan(false);
@@ -1009,7 +1055,9 @@ document.getElementById('pReload').onclick=()=>{
 };
 document.getElementById('pCopy').onclick=async e=>{
   const L=[];
+  for (const a of plan.alliances.filter(a=>a.kind==='enemy')) L.push(`[${a.tag}] enemy, holds: ${a.taken.join(', ')||'—'}`+(a.notes?`\nNotes: ${a.notes}`:''), '');
   for (const a of plan.alliances){
+    if (a.kind==='enemy') continue;
     L.push(`[${a.tag}]`);
     if (a.teams.length) L.push('Settling now: '+a.teams.map(t=>`${t.name} → ${t.region||'(not set)'}`).join(' · '));
     if (a.taken.length) L.push('Taken: '+a.taken.join(', '));
@@ -1041,10 +1089,13 @@ document.getElementById('pTokSave').onclick=async()=>{
 function renderOverlayPanel(){
   const el=document.getElementById('ovList');
   if (!plan.alliances.length){ el.innerHTML='<div>No alliance plans yet. Add them in the <a href="#plans" style="color:var(--accent)">Alliance plans</a> tab.</div>'; document.getElementById('ovBadge').textContent=''; renderApPanel(); return; }
-  el.innerHTML=plan.alliances.map((a,ai)=>`<label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}>`+
-    `<span class="ovtri">${OV_ST.map(st=>`<i style="background:${ovCss(ai,st)}"></i>`).join('')}</span><span class="t">${esc(a.tag)}</span>`+
-    `<span>${a.taken.length} · ${a.teams.filter(t=>t.region).length} · ${a.planned.length}</span></label>`).join('')+
-    `<div class="bar"><span>taken · settling · planned</span><span><button id="ovAll">All</button> <button id="ovNone">None</button></span></div>`;
+  const lbl=(a,ai)=>`<label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}>`+
+    (a.kind==='enemy' ? `<span class="ovtri"><i style="width:27px;background:${ovSw(ai,'enemy')}"></i></span><span class="t">${esc(a.tag)}</span><span>${a.taken.length} held</span>`
+      : `<span class="ovtri">${OV_ST.map(st=>`<i style="background:${ovCss(ai,st)}"></i>`).join('')}</span><span class="t">${esc(a.tag)}</span><span title="taken · settling · planned">${a.taken.length} · ${a.teams.filter(t=>t.region).length} · ${a.planned.length}</span>`)+`</label>`;
+  const fr=plan.alliances.map((a,ai)=>[a,ai]).filter(([a])=>a.kind!=='enemy'), en=plan.alliances.map((a,ai)=>[a,ai]).filter(([a])=>a.kind==='enemy');
+  el.innerHTML=(fr.length?'<div class="ovh">Friendly <span>taken · settling · planned</span></div>'+fr.map(x=>lbl(...x)).join(''):'')+
+    (en.length?'<div class="ovh">Enemy</div>'+en.map(x=>lbl(...x)).join(''):'')+
+    `<div class="bar"><span></span><span><button id="ovAll">All</button> <button id="ovNone">None</button></span></div>`;
   const shown=plan.alliances.filter(a=>!ovOff.has(a.tag)).length;
   document.getElementById('ovBadge').textContent = shown ? `${shown} shown` : '';
   el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ i.checked?ovOff.delete(i.dataset.tag):ovOff.add(i.dataset.tag); ovChanged(); });
@@ -1060,11 +1111,16 @@ function renderApPanel(){
     const s=regStats[r], me=s.by.get(a.tag)||{n:0,pop:0,vp:0}, sh=s.pop?Math.round(100*me.pop/s.pop):0; let rv=null;
     for (const [t,x] of s.by) if (t && t!==a.tag && (!rv||x.pop>rv.pop)) rv={tag:t,...x};
     const tip=`${rn}: ${a.tag} has ${me.n} of ${s.n} villages, ${fmt(me.pop)} of ${fmt(s.pop)} pop (${sh}%)${me.vp?`, ${fmt(me.vp)} VP`:''}`+(rv?`\nStrongest other alliance: ${rv.tag} (${rv.n} villages, ${fmt(rv.pop)} pop)`:'');
-    return `<div class="aprow" data-r="${r}" title="${esc(tip)}"><i style="background:${ovCss(ai,st)}"></i><span>${label}</span><span class="r">${sh}% · ${me.n}/${s.n} vill.</span></div>`; };
-  el.innerHTML=plan.alliances.map((a,ai)=>{
-    const info=allyByTag.get(a.tag);
-    let h=`<div class="apA"><label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}><span class="ovtri">${OV_ST.map(st=>`<i style="background:${ovCss(ai,st)}"></i>`).join('')}</span><b>${esc(a.tag)}</b></label>`+
+    return `<div class="aprow" data-r="${r}" title="${esc(tip)}"><i style="background:${ovSw(ai,st)}"></i><span>${label}</span><span class="r">${sh}% · ${me.n}/${s.n} vill.</span></div>`; };
+  const order=plan.alliances.map((a,ai)=>[a,ai]).sort((x,y)=>(x[0].kind==='enemy')-(y[0].kind==='enemy'));
+  let lastKind=null;
+  el.innerHTML=order.map(([a,ai])=>{
+    const info=allyByTag.get(a.tag), head=a.kind!==lastKind ? `<div class="apH">${a.kind==='enemy'?'Enemy alliances':'Friendly alliances'}</div>` : ''; lastKind=a.kind;
+    const en=a.kind==='enemy';
+    let h=head+`<div class="apA"><label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}><span class="ovtri">${en?`<i style="width:27px;background:${ovSw(ai,'enemy')}"></i>`:OV_ST.map(st=>`<i style="background:${ovCss(ai,st)}"></i>`).join('')}</span><b>${esc(a.tag)}</b>${en?'<span class="etag">enemy</span>':''}</label>`+
       `<div class="sub2">${info?`${info.players.size} players · ${info.n} villages · ${fmt(info.pop)} pop · ${fmt(allyVP.get(a.tag)||0)} VP`:'not in today\'s map.sql'}</div>`;
+    if (en){ h+=`<div class="apSec">Holds (${a.taken.length})</div>`+(a.taken.map(rn=>row(a,ai,'enemy',rn,esc(rn))).join('')||'<div class="note">None listed.</div>');
+      if (a.notes) h+=`<div class="apSec">Notes</div><div class="pnotesv" style="font-size:12.5px">${esc(a.notes)}</div>`; return h+'</div>'; }
     const set=a.teams.filter(t=>t.region);
     if (set.length) h+='<div class="apSec">Settling now</div>'+set.map(t=>row(a,ai,'settling',t.region,`${esc(t.region)} <span class="note">· ${esc(t.name)}</span>`)).join('');
     if (a.taken.length) h+=`<div class="apSec">Taken (${a.taken.length})</div>`+a.taken.map(rn=>row(a,ai,'taken',rn,esc(rn))).join('');
