@@ -421,12 +421,19 @@ function paintBase(){
   bctx.putImageData(img,0,0);
 }
 // ---------- alliance plans overlay ----------
-const OV_HUES=[0,215,52,135,300,185,28,265,340,95,200,15];   // far-apart hues first: red, blue, yellow, green, magenta, cyan, orange, violet
+// friendly alliances get cool colours, enemies warm ones (far-apart hues first)
+const OV_HUES_FR=[135,215,185,265,95,160,240,200];   // green, blue, cyan, violet, lime, teal, indigo, sky
+const OV_HUES_EN=[0,30,55,320,345,15,42,295];       // red, orange, yellow, magenta, crimson, red-orange, amber, pink
 const OV_ST=['taken','settling','planned'];
 const OV_L={taken:'27%',settling:'50%',planned:'79%',enemy:'47%'}, OV_S={taken:'78%',settling:'92%',planned:'88%',enemy:'85%'};
 // swatch background; enemy-held regions are hatched with dark diagonal lines (like on the map)
 const ovSw=(ai,st)=>st==='enemy' ? `repeating-linear-gradient(135deg,${ovCss(ai,st)} 0 3px,rgba(0,0,0,.65) 3px 4.5px)` : ovCss(ai,st);
-const ovCss=(ai,st)=>`hsl(${OV_HUES[ai%OV_HUES.length]+(ai>=OV_HUES.length?15:0)},${OV_S[st]},${OV_L[st]})`;
+function ovHue(ai){
+  const a=plan.alliances[ai], en=a&&a.kind==='enemy', H=en?OV_HUES_EN:OV_HUES_FR;
+  let k=0; for (let j=0;j<ai;j++) if ((plan.alliances[j].kind==='enemy')===en) k++;
+  return H[k%H.length]+(k>=H.length?10:0);
+}
+const ovCss=(ai,st)=>`hsl(${ovHue(ai)},${OV_S[st]},${OV_L[st]})`;
 const OV_KEY='travian-rog-x2-overlay';
 let ovOff=new Set(); try{ ovOff=new Set(JSON.parse(localStorage.getItem(OV_KEY)||'[]')); }catch(e){}   // alliances the viewer unticked
 // region index -> [{ai, tag, st, team, n}] for the alliances shown on the map (best status per alliance)
