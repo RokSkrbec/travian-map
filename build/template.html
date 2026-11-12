@@ -18,7 +18,7 @@
   .tabs button:hover { color:var(--text); }
   .tabs button.on { color:var(--text); border-bottom-color:var(--accent); }
   #app { flex:1; display:flex; min-height:0; }
-  #app[hidden], #plans[hidden] { display:none; }
+  #app[hidden], #plans[hidden], #farms[hidden] { display:none; }
   button { background:#2a303a; color:var(--text); border:1px solid #3a414d; border-radius:4px; padding:2px 8px; font-size:12px; cursor:pointer; font-family:inherit; }
   button:disabled { opacity:.4; cursor:default; }
   input[type=text], input[type=number] { padding:5px 8px; background:#111419; border:1px solid #333a45; color:var(--text); border-radius:4px; font:inherit; font-size:13px; width:100%; }
@@ -163,12 +163,28 @@
   .ovh span { color:var(--muted); text-transform:none; letter-spacing:0; }
   .apH { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:14px 0 0; }
   .empty { margin:30px 0; color:var(--muted); text-align:center; }
+
+  /* farms & changes tab */
+  #farms { flex:1; overflow:auto; }
+  .fctl { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin:10px 0 4px; font-size:13px; }
+  .fctl label { display:inline-flex; align-items:center; gap:6px; color:var(--muted); }
+  .fctl input[type=text] { width:90px; } .fctl input[type=number] { width:76px; } .fctl input.wide { width:180px; }
+  .ftab th[data-k] { cursor:pointer; user-select:none; } .ftab th[data-k]:hover { color:var(--text); }
+  .ftab th.sorted { color:var(--accent); }
+  .ftab tr.fr { cursor:pointer; } .ftab tr.fr:hover td { background:#232831; }
+  .ftab .tr { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ftab .down { color:#ff8a80; } .ftab .up { color:#7fd99a; }
+  .tag { font-size:10.5px; border:1px solid #3a414d; border-radius:3px; padding:0 4px; color:var(--muted); margin-left:4px; }
+  .tag.new { color:#7fd99a; border-color:#2f6a3f; }
+  .csum { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0; }
+  .csum button { padding:4px 10px; } .csum button.on { background:#3a414d; border-color:var(--accent); }
+  .more { margin:8px 0 0; }
 </style>
 </head>
 <body>
 <div id="top">
   <h1>Ancient Europe regions</h1>
-  <nav class="tabs"><button data-tab="map" class="on">Map</button><button data-tab="plans">Alliance plans</button></nav>
+  <nav class="tabs"><button data-tab="map" class="on">Map</button><button data-tab="plans">Alliance plans</button><button data-tab="farms">Farms &amp; changes</button></nav>
   <button id="copyLink" title="Copy a link to exactly this view: position, zoom, filters, highlighted regions, overlay and open panel">🔗 Copy link</button>
 </div>
 <div id="app">
@@ -296,13 +312,43 @@
     <div id="pList"></div>
   </div>
 </div>
+<div id="farms" hidden>
+  <div class="pwrap">
+    <div class="phead"><h2>Farms &amp; changes</h2><span class="note" id="fHist"></span></div>
+    <div class="pcard">
+      <header><h3>Potential farms</h3><span class="note">players whose population hasn't grown</span>
+        <div class="sp"><button id="fCopy" title="Copy this list as tab-separated text (pastes into spreadsheets)">Copy list</button></div></header>
+      <div class="fctl">
+        <label>From <input type="text" id="fFrom" placeholder="x|y" title="Your village's coordinates, for distances"></label>
+        <label>No growth for <select id="fIdle"><option value="1">1+ day</option><option value="2">2+ days</option><option value="3">3+ days</option><option value="4">4+ days</option><option value="5">5+ days</option><option value="7">7+ days</option></select></label>
+        <label>Judged by <select id="fJudge" title="Player: the player's total population across all villages. Village: just that village."><option value="player">player's total pop</option><option value="village">village pop</option></select></label>
+        <label>Max distance <input type="number" id="fDist" min="0" step="5" placeholder="any"></label>
+        <label>Village pop <input type="number" id="fMin" min="0" step="50" placeholder="min"> – <input type="number" id="fMax" min="0" step="50" placeholder="max"></label>
+        <label>Alliances <select id="fAlly"><option value="nofriend">all except friendly (plans)</option><option value="all">all</option><option value="none">players without alliance</option><option value="enemy">enemy alliances (plans)</option></select></label>
+        <label><input type="text" id="fQ" class="wide" placeholder="Search player, alliance, region…"></label>
+      </div>
+      <div class="note" id="fNote"></div>
+      <div class="tw"><table class="ptab ftab" id="fTab"><thead></thead><tbody></tbody></table></div>
+      <button class="more" id="fMore" hidden></button>
+    </div>
+    <div class="pcard">
+      <header><h3>Changes</h3>
+        <label class="note" style="display:inline-flex;gap:6px;align-items:center">since <select id="cSince"></select></label>
+        <div class="sp"><input type="text" id="cQ" placeholder="Search…" style="width:200px"></div></header>
+      <div class="csum" id="cSum"></div>
+      <div class="note" id="cNote" style="margin-top:8px"></div>
+      <div class="tw"><table class="ptab ftab" id="cTab"><thead></thead><tbody></tbody></table></div>
+      <button class="more" id="cMore" hidden></button>
+    </div>
+  </div>
+</div>
 <datalist id="allyDL"></datalist>
 <script>
 const DATA = __DATA__;
 const N = 401, MIN = -200, S = N / 185;
 const REG = DATA.regions, names = REG.map(r => r.n), NR = names.length;
 const nameIdx = Object.fromEntries(names.map((n, i) => [n, i]));
-// village row: [x, y, regionIdx, tribe, villageName, player, alliance, population, flags(1=capital,2=city,4=harbor), victoryPoints]
+// village row: [x, y, regionIdx, tribe, villageName, player, alliance, population, flags(1=capital,2=city,4=harbor), victoryPoints, villageId, playerId]
 const V = DATA.v.map(a => [a[0], a[1], nameIdx[a[2]] ?? -1, ...a.slice(3)]);
 const TRIBES = {1:['Romans','#e5534b'],2:['Teutons','#4f8fe6'],3:['Gauls','#3fcf6e'],5:['Natars','#a0a0a0'],6:['Egyptians','#f0cf3a'],7:['Huns','#b56cf0'],8:['Spartans','#f58b35']};
 const vAt = new Map(); for (const v of V) vAt.set((200-v[1])*N + (v[0]-MIN), v);
@@ -799,12 +845,14 @@ try{ if (localStorage.getItem('travian-rog-x2-list')){ document.getElementById('
 
 // ---------- tabs ----------
 let needFit=false;
+let curTab='map';
 function setTab(t){
-  const plans = t==='plans';
-  document.getElementById('app').hidden=plans; document.getElementById('plans').hidden=!plans;
+  if (!['map','plans','farms'].includes(t)) t='map'; curTab=t;
+  document.getElementById('app').hidden=t!=='map'; document.getElementById('plans').hidden=t!=='plans'; document.getElementById('farms').hidden=t!=='farms';
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
-  if (location.hash !== (plans?'#plans':'') ) history.replaceState(null,'', plans ? location.pathname+location.search+'#plans' : location.pathname+location.search);
-  if (plans) renderPlans(); else { if (needFit||!(scale>0.5)) { fit(); needFit=false; } applyView(); renderOverlayPanel(); paintBase(); draw(); }
+  const hash=t==='map'?'':'#'+t;
+  if (location.hash !== hash) history.replaceState(null,'', location.pathname+location.search+hash);
+  if (t==='plans') renderPlans(); else if (t==='farms') renderFarms(); else { if (needFit||!(scale>0.5)) { fit(); needFit=false; } applyView(); renderOverlayPanel(); paintBase(); draw(); }
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
@@ -1107,6 +1155,7 @@ document.getElementById('pTokSave').onclick=async()=>{
   }catch(err){ note.textContent=err.message; }
 };
 function renderOverlayPanel(){
+  if (curTab==='farms') renderFarmTable();   // the farm list's alliance filter uses the plan
   const el=document.getElementById('ovList');
   if (!plan.alliances.length){ el.innerHTML='<div>No alliance plans yet. Add them in the <a href="#plans" style="color:var(--accent)">Alliance plans</a> tab.</div>'; document.getElementById('ovBadge').textContent=''; renderApPanel(); return; }
   const lbl=(a,ai)=>`<label><input type="checkbox" data-tag="${esc(a.tag)}"${ovOff.has(a.tag)?'':' checked'}>`+
@@ -1157,6 +1206,146 @@ document.getElementById('apClose').onclick=()=>setSidePanel('');
 function ovChanged(){ try{ localStorage.setItem(OV_KEY, JSON.stringify([...ovOff])); }catch(e){} renderOverlayPanel(); paintBase(); draw(); }
 window.addEventListener('beforeunload',e=>{ if (dirty()){ e.preventDefault(); e.returnValue=''; } });
 
+// ---------- farms & changes (daily snapshots of map.sql, saved by the nightly build) ----------
+const H = DATA.h || {dates:[], vp:[], pp:{}, ev:[]};
+const HL = H.dates.length - 1;                                   // index of today's snapshot
+const dayNum = d => Date.UTC(+d.slice(0,4), +d.slice(5,7)-1, +d.slice(8,10)) / 864e5;
+const shortDate = d => new Date(dayNum(d)*864e5).toLocaleDateString('en-GB', {day:'numeric', month:'short', timeZone:'UTC'});
+// days without growth: from the last snapshot where the population went up to today.
+// If it never went up in the history we have, it's at least the whole span (atLeast=true).
+function idleOf(s){
+  if (!s || HL<1) return {days:0, atLeast:true, delta:0};
+  let f=s.findIndex(x=>x>=0); if (f<0) f=HL;
+  let k=HL; while (k>f && !(s[k]>=0 && s[k-1]>=0 && s[k]>s[k-1])) k--;
+  return {days:dayNum(H.dates[HL])-dayNum(H.dates[k]), atLeast:k===f, delta:s[HL]-s[f], first:f};
+}
+const plIdle=new Map(), plInfo=new Map();
+for (const v of V){ let p=plInfo.get(v[11]); if(!p){ p={n:0,pop:0}; plInfo.set(v[11],p); } p.n++; p.pop+=v[7]; }
+for (const uid of plInfo.keys()) plIdle.set(uid, idleOf(H.pp[uid]));
+const regionAt=(x,y)=>{ const r=grid[(200-y)*N+(x-MIN)]; return r>=0?names[r]:''; };
+const trendTxt=s=>{ if(!s) return ''; const a=s.slice(Math.max(0,HL-3)).filter(x=>x>=0); return a.join(' → '); };
+
+const FARM_KEY='travian-rog-x2-farms';
+const fEl=id=>document.getElementById(id);
+const FDEF={fFrom:'', fIdle:'2', fJudge:'player', fDist:'', fMin:'', fMax:'', fAlly:'nofriend', fQ:'', cSince:'1', cQ:''};
+const FURL={fFrom:'from', fIdle:'idle', fJudge:'judge', fDist:'dist', fMin:'fmin', fMax:'fmax', fAlly:'fally', cSince:'since'};
+let fSort={k:'dist', d:1}, fLimit=200, cLimit=200, cType='new';
+function farmSave(){ const o={}; for (const k in FDEF) o[k]=fEl(k).value; try{ localStorage.setItem(FARM_KEY, JSON.stringify(o)); }catch(e){} }
+function farmUrl(q){ for (const [id,k] of Object.entries(FURL)){ const v=fEl(id).value.trim(); if (v && v!==FDEF[id]) q.set(k,v); } }
+function applyFarmUrl(){
+  const sel=fEl('cSince'); sel.innerHTML='';
+  for (let n=1;n<=Math.max(1,HL);n++) sel.add(new Option(n===1?'yesterday':`${n} days ago`+(H.dates[HL-n]?` (${shortDate(H.dates[HL-n])})`:''), String(n)));
+  let o={}; try{ o=JSON.parse(localStorage.getItem(FARM_KEY)||'{}'); }catch(e){}
+  const q=new URLSearchParams(location.search);
+  for (const id in FDEF){ const k=FURL[id]; fEl(id).value = (k && q.has(k)) ? q.get(k) : (o[id] ?? FDEF[id]); }
+  if (!fEl('cSince').value) fEl('cSince').value='1';
+  if (!fEl('fIdle').value) fEl('fIdle').value='2';
+}
+const parseXY=t=>{ const m=String(t).match(/^\s*\(?(-?\d+)\s*[|,\s]\s*(-?\d+)\)?\s*$/); return m?{x:+m[1],y:+m[2]}:null; };
+function gotoXY(x,y){
+  setTab('map'); const v=vAt.get((200-y)*N+(x-MIN)); focus=v?[v]:[];
+  scale=Math.max(scale,8); ox=main.clientWidth/2-(x-MIN+.5)*scale; oy=main.clientHeight/2-(200-y+.5)*scale; draw();
+}
+function sortTable(rows, cols){
+  const c=cols.find(c=>c.k===fSort.k)||cols[0], key=c.sv||(r=>r[c.k]);
+  return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (typeof x==='string' ? x.localeCompare(y) : x-y)*fSort.d; });
+}
+const FCOLS=[
+  {k:'dist',t:'Dist.',num:1,f:r=>r.dist==null?'':r.dist.toFixed(1), sv:r=>r.dist??1e9},
+  {k:'vname',t:'Village'}, {k:'xy',t:'x|y', sv:r=>r.x*1000+r.y},
+  {k:'region',t:'Region'}, {k:'player',t:'Player'}, {k:'ally',t:'Alliance'},
+  {k:'tribe',t:'Tribe'},
+  {k:'pop',t:'Pop',num:1},
+  {k:'idle',t:'No growth',num:1,f:r=>(r.atLeast?'≥ ':'')+r.idle+' d', sv:r=>r.idle+(r.atLeast?.5:0)},
+  {k:'trend',t:'Last days',f:r=>`<span class="tr ${r.delta<0?'down':''}">${esc(r.trend)}</span>`, sv:r=>r.delta},
+  {k:'pn',t:'Player vill.',num:1}, {k:'ppop',t:'Player pop',num:1},
+];
+function farmRows(){
+  const from=parseXY(fEl('fFrom').value), N_=+fEl('fIdle').value||2, judge=fEl('fJudge').value;
+  const maxD=+fEl('fDist').value||0, mn=+fEl('fMin').value||0, mx=+fEl('fMax').value||0, am=fEl('fAlly').value, q=fEl('fQ').value.trim().toLowerCase();
+  const friends=new Set(plan.alliances.filter(a=>a.kind!=='enemy').map(a=>a.tag)), enemies=new Set(plan.alliances.filter(a=>a.kind==='enemy').map(a=>a.tag));
+  const out=[];
+  V.forEach((v,i)=>{
+    if (v[11]===1 || v[3]===5) return;                                      // Natars
+    if (am==='nofriend' && friends.has(v[6])) return; if (am==='none' && v[6]) return; if (am==='enemy' && !enemies.has(v[6])) return;
+    if (mn && v[7]<mn) return; if (mx && v[7]>mx) return;
+    const id = judge==='village' ? idleOf(H.vp[i]) : plIdle.get(v[11]);
+    if (!id || id.days<N_) return;
+    const dist = from ? Math.hypot(v[0]-from.x, v[1]-from.y) : null; if (maxD && dist!=null && dist>maxD) return;
+    const p=plInfo.get(v[11]), r={dist, vname:v[4], x:v[0], y:v[1], xy:`${v[0]}|${v[1]}`, region:v[2]>=0?names[v[2]]:'', player:v[5], ally:v[6],
+      tribe:(TRIBES[v[3]]||['?'])[0], pop:v[7], idle:id.days, atLeast:id.atLeast, delta:id.delta,
+      trend:trendTxt(judge==='village'?H.vp[i]:H.pp[v[11]]), pn:p.n, ppop:p.pop};
+    if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy}`.toLowerCase().includes(q)) return;
+    out.push(r);
+  });
+  return out;
+}
+function tableHtml(cols, rows, limit){
+  const th=cols.map(c=>`<th data-k="${c.k}"${c.num?' class="num'+(fSort.k===c.k?' sorted':'')+'"':(fSort.k===c.k?' class="sorted"':'')}>${c.t}${fSort.k===c.k?(fSort.d>0?' ▲':' ▼'):''}</th>`).join('');
+  const tb=rows.slice(0,limit).map(r=>`<tr${r.xy?` class="fr" data-x="${r.x}" data-y="${r.y}"`:''}>`+cols.map(c=>`<td${c.num?' class="num"':''}>${c.f?c.f(r):esc(r[c.k]??'')}</td>`).join('')+'</tr>').join('');
+  return [`<tr>${th}</tr>`, tb];
+}
+let fRowsCache=[];
+function renderFarmTable(){
+  if (HL<1){ fEl('fNote').innerHTML=`Tracking started on <b>${shortDate(H.dates[0]||new Date().toISOString())}</b>. Each night's map.sql is saved, so players who stop growing show up here once there are at least two days of history.`;
+    fEl('fTab').tHead.innerHTML=''; fEl('fTab').tBodies[0].innerHTML=''; fEl('fMore').hidden=true; return; }
+  const rows=sortTable(farmRows(), FCOLS); fRowsCache=rows;
+  const from=parseXY(fEl('fFrom').value), N_=+fEl('fIdle').value;
+  const pl=new Set(rows.map(r=>r.player)).size;
+  fEl('fNote').innerHTML=`${fmt(rows.length)} villages of ${fmt(pl)} players`+(HL+1<=N_?` · <span class="warn">only ${HL+1} days of history so far, so nobody can show ${N_}+ days yet</span>`:'')+
+    (from?'':' · enter your coordinates in <b>From</b> to sort by distance')+' · click a row to see it on the map';
+  const [h,b]=tableHtml(FCOLS, rows, fLimit); fEl('fTab').tHead.innerHTML=h; fEl('fTab').tBodies[0].innerHTML=b;
+  fEl('fMore').hidden=rows.length<=fLimit; fEl('fMore').textContent=`Show all ${fmt(rows.length)}`;
+}
+const CTYPES={new:'New villages', conq:'Conquered', gone:'Gone', ally:'Alliance changes'};
+const allyTxt=t=>t?`[${esc(t)}]`:'<span class="note">none</span>';
+const CCOLS={
+  new:[{k:'date',t:'Day'},{k:'vname',t:'Village',f:r=>esc(r.vname)+(r.extra?'<span class="tag new">new player</span>':'')},{k:'xy',t:'x|y',sv:r=>r.x*1000+r.y},{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},{k:'tribe',t:'Tribe'},{k:'pop',t:'Pop',num:1}],
+  conq:[{k:'date',t:'Day'},{k:'vname',t:'Village'},{k:'xy',t:'x|y',sv:r=>r.x*1000+r.y},{k:'region',t:'Region'},{k:'extra',t:'From'},{k:'player',t:'To'},{k:'ally',t:'Alliance'},{k:'pop',t:'Pop',num:1}],
+  gone:[{k:'date',t:'Day'},{k:'vname',t:'Village',f:r=>esc(r.vname)+(r.extra?'<span class="tag">player gone</span>':'')},{k:'xy',t:'x|y',sv:r=>r.x*1000+r.y},{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},{k:'pop',t:'Last pop',num:1}],
+  ally:[{k:'date',t:'Day'},{k:'player',t:'Player'},{k:'extra',t:'From',f:r=>allyTxt(r.extra)},{k:'ally',t:'To',f:r=>allyTxt(r.ally)},{k:'pop',t:'Player pop',num:1}],
+};
+function changeRows(){
+  const since=+fEl('cSince').value||1, q=fEl('cQ').value.trim().toLowerCase(), out={new:[],conq:[],gone:[],ally:[]};
+  for (const e of H.ev){ if (e[1]<=HL-since) continue;
+    const r={type:e[0], date:shortDate(H.dates[e[1]]), day:e[1], x:e[2], y:e[3], xy:e[0]==='ally'?'':`${e[2]}|${e[3]}`, region:e[0]==='ally'?'':regionAt(e[2],e[3]),
+      vname:e[4], player:e[5], ally:e[6], pop:e[7], tribe:(TRIBES[e[8]]||[''])[0], extra:e[9]};
+    if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy} ${r.extra}`.toLowerCase().includes(q)) continue;
+    out[r.type]?.push(r); }
+  return out;
+}
+let cSort={k:'date', d:-1};
+function renderChanges(){
+  if (HL<1){ fEl('cSum').innerHTML=''; fEl('cNote').textContent='Day-to-day changes appear after the next nightly update.'; fEl('cTab').tHead.innerHTML=''; fEl('cTab').tBodies[0].innerHTML=''; fEl('cMore').hidden=true; return; }
+  const all=changeRows();
+  fEl('cSum').innerHTML=Object.entries(CTYPES).map(([k,t])=>`<button data-ct="${k}" class="${k===cType?'on':''}">${t} <b>${fmt(all[k].length)}</b></button>`).join('');
+  const newPl=new Set(all.new.filter(r=>r.extra).map(r=>r.player)).size;
+  fEl('cNote').textContent = cType==='new' ? `${newPl} new players.` : cType==='gone' ? 'Villages that are no longer on the map (destroyed or deleted).' : cType==='conq' ? 'Villages that changed owner.' : 'Players who joined, left or switched alliance.';
+  const cols=CCOLS[cType], save=fSort; fSort=cSort;
+  const rows=sortTable(all[cType], cols.map(c=>c.k==='date'?{...c, sv:r=>r.day}:c));
+  const [h,b]=tableHtml(cols, rows, cLimit); fSort=save;
+  fEl('cTab').tHead.innerHTML=h; fEl('cTab').tBodies[0].innerHTML=b;
+  fEl('cMore').hidden=rows.length<=cLimit; fEl('cMore').textContent=`Show all ${fmt(rows.length)}`;
+}
+function renderFarms(){
+  fEl('fHist').textContent = H.dates.length ? `${H.dates.length} daily snapshot${H.dates.length>1?'s':''}: ${shortDate(H.dates[0])} – ${shortDate(H.dates[HL])} · map.sql of __DATE__` : '';
+  renderFarmTable(); renderChanges();
+}
+function farmChanged(){ fLimit=200; cLimit=200; farmSave(); renderFarms(); syncUrlSoon(); }
+for (const id of Object.keys(FDEF)) fEl(id).addEventListener(fEl(id).tagName==='SELECT'?'change':'input', farmChanged);
+fEl('fMore').onclick=()=>{ fLimit=1e9; renderFarmTable(); };
+fEl('cMore').onclick=()=>{ cLimit=1e9; renderChanges(); };
+fEl('cSum').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; cType=b.dataset.ct; cSort={k:'date',d:-1}; cLimit=200; renderChanges(); };
+fEl('fTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; fSort = fSort.k===k ? {k, d:-fSort.d} : {k, d:['pop','idle','pn','ppop'].includes(k)?-1:1}; renderFarmTable(); };
+fEl('cTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; cSort = cSort.k===k ? {k, d:-cSort.d} : {k, d:k==='pop'?-1:1}; renderChanges(); };
+for (const t of ['fTab','cTab']) fEl(t).tBodies[0].onclick=e=>{ const tr=e.target.closest('tr.fr'); if (tr) gotoXY(+tr.dataset.x, +tr.dataset.y); };
+fEl('fCopy').onclick=async e=>{
+  const L=[FCOLS.map(c=>c.t).join('\t'), ...fRowsCache.map(r=>FCOLS.map(c=>c.k==='idle'?(r.atLeast?'>=':'')+r.idle:c.k==='dist'?(r.dist==null?'':r.dist.toFixed(1)):r[c.k]).join('\t'))].join('\n');
+  const btn=e.currentTarget, old=btn.textContent;
+  try{ await navigator.clipboard.writeText(L); btn.textContent='✓ Copied'; }catch(_){ window.prompt('Copy:', L); }
+  setTimeout(()=>btn.textContent=old,1600);
+};
+
 // ---------- shareable links: map settings live in the URL's query string ----------
 // Only settings that differ from the defaults are written. A link with any of these parameters
 // replaces the settings saved in the browser; a plain link keeps them.
@@ -1178,6 +1367,7 @@ function urlState(){
   for (const tg of ovOff) q.append('hide',tg);
   const panel=!document.getElementById('res').hidden?'res':!document.getElementById('ap').hidden?'ap':''; if (panel) q.set('panel',panel);
   if (panel==='res' && resTab()!=='players') q.set('list',resTab());
+  farmUrl(q);
   return q.toString().replace(/%2C/g,',').replace(/%7C/g,'|');
 }
 // remember the map centre (as x|y) and zoom whenever the map is drawn
@@ -1215,10 +1405,10 @@ document.getElementById('copyLink').onclick=async e=>{
 };
 document.querySelectorAll('input[name=resTab]').forEach(r=>r.addEventListener('change',syncUrlSoon));
 
-applyUrl();
+applyUrl(); applyFarmUrl();
 fit(); applyView(); allyChanged(); refresh();
 loadPlan();
-if (location.hash==='#plans') setTab('plans');   // the map was already sized above, so no re-fit is needed later
+if (location.hash==='#plans' || location.hash==='#farms') setTab(location.hash.slice(1));   // the map was already sized above, so no re-fit is needed later
 </script>
 </body>
 </html>

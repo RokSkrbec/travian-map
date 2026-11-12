@@ -16,11 +16,21 @@ The page keeps its settings in the address bar: map position and zoom (`v=x,y,zo
 
 The **Alliance plans** tab lists friendly and enemy alliances. Enemy alliances are just a list of the regions they hold, prefilled from `map.sql` with the regions where they have the most population (3+ villages), to be checked by hand. For each friendly alliance it holds its teams, the region each team is settling now, the regions already taken and the regions planned next, with live numbers from `map.sql` for each region. On the **Map** tab, the **Alliance plans overlay** panel colours each plan alliance's regions in its own colour (taken = the alliance's colour, settling now = darker, planned next = lighter; enemy regions hatched). Each alliance's colour is a hex code saved in `plans.json`, set with the colour picker on its card. B.U., BUPhx, BU-UN, NEFES, NnFn and C&D default to the coalition map's colours; other alliances get a generated colour (cool for friendly, warm for enemy); each viewer can tick which alliances to show. The plan is stored in `plans.json` in this repo, so everyone sees the same plan. Anyone can view it. To edit, open **Editor access** and paste a GitHub token with write access to this repo; the token stays in that browser. Saves are commits marked `[skip ci]`, so they don't trigger a rebuild, and the page always reads the latest `plans.json` straight from GitHub.
 
+## Farms & changes tab
+
+Every build saves a compact copy of that day's `map.sql` (village, owner, population) to `history/YYYY-MM-DD.json` and the workflow commits it (`[skip ci]`). The page gets the last 8 days:
+
+- **Potential farms**: villages of players whose total population hasn't grown for N days (or, optionally, just the village's population), with distance from your coordinates, filters for distance, population and alliance (friendly plan alliances are left out by default), and a copyable list. Active players almost always grow every day, so no growth usually means inactive. It can't see troops or hidden resources.
+- **Changes**: new villages (and new players), conquered villages, villages that disappeared, and alliance joins/leaves/switches since a chosen day.
+
+Tracking started on 12 Nov 2026, so the history only goes back to then.
+
 ## Files
 
 - `build/update_map.py` — downloads `map.sql`, parses every village and writes `travian-regions.html`.
 - `build/template.html` — the page (HTML/CSS/JS).
 - `build/regions.json` — official region outlines from the in-game region pages (they don't change).
+- `history/` — one snapshot per day, written by the build.
 
 Build locally:
 
