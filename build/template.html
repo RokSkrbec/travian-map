@@ -166,6 +166,14 @@
 
   /* farms & changes tab */
   #farms { flex:1; overflow:auto; }
+  #farms .pwrap { max-width:none; padding:14px 16px 60px; }
+  #farms .pcard { padding:10px 12px 12px; }
+  #farms .ftab { font-size:12px; } #farms .ftab td, #farms .ftab th { padding:3px 5px; }
+  .fcard > header { cursor:pointer; user-select:none; }
+  .fcard > header h3::before { content:'▾'; display:inline-block; width:16px; color:var(--muted); font-size:13px; }
+  .fcard.closed > header h3::before { content:'▸'; }
+  .fcard.closed > :not(header) { display:none !important; }
+  .fcard.closed > header .sp { display:none; }
   .fctl { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin:10px 0 4px; font-size:13px; }
   .fctl label { display:inline-flex; align-items:center; gap:6px; color:var(--muted); }
   .fctl input[type=text] { width:90px; } .fctl input[type=number] { width:76px; } .fctl input.wide { width:180px; }
@@ -317,7 +325,7 @@
 <div id="farms" hidden>
   <div class="pwrap">
     <div class="phead"><h2>Farms &amp; changes</h2><span class="note" id="fHist"></span></div>
-    <div class="pcard">
+    <div class="pcard fcard" data-card="farms">
       <header><h3>Potential farms</h3><span class="note">players whose population hasn't grown</span>
         <div class="sp"><button id="fCopy" title="Copy this list as tab-separated text (pastes into spreadsheets)">Copy list</button></div></header>
       <div class="fctl">
@@ -334,7 +342,7 @@
       <div class="tw"><table class="ptab ftab" id="fTab"><thead></thead><tbody></tbody></table></div>
       <button class="more" id="fMore" hidden></button>
     </div>
-    <div class="pcard">
+    <div class="pcard fcard" data-card="mine">
       <header><h3>My farms</h3><span class="note">from your Travian farm lists · kept in this browser only</span>
         <div class="sp"><button id="mPasteBtn" class="primary">Paste farm lists</button><button id="mCopy" title="Copy this list as tab-separated text">Copy list</button><button id="mClear" title="Forget the pasted farm lists">Clear</button></div></header>
       <div id="mPaste" hidden style="margin-top:10px">
@@ -352,7 +360,7 @@
       <div class="tw"><table class="ptab ftab" id="mTab"><thead></thead><tbody></tbody></table></div>
       <button class="more" id="mMore" hidden></button>
     </div>
-    <div class="pcard">
+    <div class="pcard fcard" data-card="changes">
       <header><h3>Changes</h3>
         <label class="note" style="display:inline-flex;gap:6px;align-items:center">since <select id="cSince"></select></label>
         <div class="sp"><input type="text" id="cQ" placeholder="Search…" style="width:200px"></div></header>
@@ -1488,6 +1496,17 @@ fEl('mCopy').onclick=async e=>{
   setTimeout(()=>btn.textContent=old,1600);
 };
 
+// farms tab cards fold open/closed by clicking their header (remembered per browser)
+const CARD_KEY='travian-rog-x2-farmcards';
+let closedCards=new Set(); try{ closedCards=new Set(JSON.parse(localStorage.getItem(CARD_KEY)||'[]')); }catch(e){}
+document.querySelectorAll('.fcard').forEach(card=>{
+  card.classList.toggle('closed', closedCards.has(card.dataset.card));
+  card.querySelector('header').addEventListener('click', e=>{
+    if (e.target.closest('button, input, select, label, a, textarea')) return;
+    card.classList.toggle('closed'); closedCards[card.classList.contains('closed')?'add':'delete'](card.dataset.card);
+    try{ localStorage.setItem(CARD_KEY, JSON.stringify([...closedCards])); }catch(_){}
+  });
+});
 function renderFarms(){
   fEl('fHist').textContent = H.dates.length ? `${H.dates.length} daily snapshot${H.dates.length>1?'s':''}: ${shortDate(H.dates[0])} – ${shortDate(H.dates[HL])} · map.sql of __DATE__` : '';
   renderFarmTable(); renderMyFarms(); renderChanges();
