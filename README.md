@@ -21,6 +21,7 @@ The **Alliance plans** tab lists friendly and enemy alliances. Enemy alliances a
 Every build saves a compact copy of that day's `map.sql` (village, owner, population) to `history/YYYY-MM-DD.json` and the workflow commits it (`[skip ci]`). The page gets the last 8 days:
 
 - **Potential farms**: villages of players whose total population hasn't grown for N days (or, optionally, just the village's population), with distance from your coordinates, filters for distance, population and alliance (friendly plan alliances are left out by default), and a copyable list. Active players almost always grow every day, so no growth usually means inactive. It can't see troops or hidden resources.
+- **My farms**: paste the rally point's Farm List page (select all, copy) and the page reads every list. The page text has no coordinates, so each target is matched to the village with that name at that distance from the list's own village (taken from the village list on the same page). Each target gets a status: inactive, growing, new owner, gone, or not found (oases, renamed villages). Potential farms gets a Farm list column and an "in / not in my farm lists" filter. The lists stay in that browser only (localStorage) and the pasted text isn't kept.
 - **Changes**: new villages (and new players), conquered villages, villages that disappeared, population drops (catapults, conquest; summed per village, with % of its peak), and alliance joins/leaves/switches since a chosen day.
 
 Tracking started on 12 Nov 2026, so the history only goes back to then.

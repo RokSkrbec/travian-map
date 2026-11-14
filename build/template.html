@@ -177,7 +177,7 @@
   .ftab th.day, .ftab td.day { min-width:84px; } .ftab th.day { font-size:11.5px; }
   .ftab a.tv { color:var(--accent); text-decoration:none; } .ftab a.tv:hover { text-decoration:underline; }
   .tag { font-size:10.5px; border:1px solid #3a414d; border-radius:3px; padding:0 4px; color:var(--muted); margin-left:4px; }
-  .tag.new { color:#7fd99a; border-color:#2f6a3f; }
+  .tag.new { color:#7fd99a; border-color:#2f6a3f; } .tag.warn { color:#ffb454; border-color:#6b5521; } .tag.bad { color:#ff8a80; border-color:#7a3434; }
   .csum { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0; }
   .csum button { padding:4px 10px; } .csum button.on { background:#3a414d; border-color:var(--accent); }
   .more { margin:8px 0 0; }
@@ -327,11 +327,30 @@
         <label>Max distance <input type="number" id="fDist" min="0" step="5" placeholder="any"></label>
         <label>Village pop <input type="number" id="fMin" min="0" step="50" placeholder="min"> – <input type="number" id="fMax" min="0" step="50" placeholder="max"></label>
         <label>Alliances <select id="fAlly"><option value="nofriend">all except friendly (plans)</option><option value="all">all</option><option value="none">players without alliance</option><option value="enemy">enemy alliances (plans)</option></select></label>
+        <label>Farm lists <select id="fIn" title="Compare with the farm lists you pasted under My farms"><option value="">all</option><option value="out">not in my farm lists</option><option value="in">already in my farm lists</option></select></label>
         <label><input type="text" id="fQ" class="wide" placeholder="Search player, alliance, region…"></label>
       </div>
       <div class="note" id="fNote"></div>
       <div class="tw"><table class="ptab ftab" id="fTab"><thead></thead><tbody></tbody></table></div>
       <button class="more" id="fMore" hidden></button>
+    </div>
+    <div class="pcard">
+      <header><h3>My farms</h3><span class="note">from your Travian farm lists · kept in this browser only</span>
+        <div class="sp"><button id="mPasteBtn" class="primary">Paste farm lists</button><button id="mCopy" title="Copy this list as tab-separated text">Copy list</button><button id="mClear" title="Forget the pasted farm lists">Clear</button></div></header>
+      <div id="mPaste" hidden style="margin-top:10px">
+        <div class="note">In Travian open <b>Rally point → Farm List</b>, press <b>Ctrl/⌘+A</b> then <b>Ctrl/⌘+C</b>, and paste the whole page below. All lists on the page are read. Paste again whenever your lists change; the text itself isn't kept, and nothing is sent anywhere.</div>
+        <textarea id="mText" class="pnotes" style="min-height:90px;margin-top:6px" placeholder="Paste the farm list page here…"></textarea>
+        <div class="bar" style="justify-content:flex-start;margin-top:6px"><button id="mRead" class="primary">Read farm lists</button></div>
+      </div>
+      <div class="pmsg" id="mMsg"></div>
+      <div class="fctl">
+        <label>List <select id="mList"></select></label>
+        <label>Status <select id="mStatus"><option value="">all</option><option value="check">needs a look (growing, new owner, gone, not found)</option><option value="inactive">inactive</option><option value="growing">growing</option><option value="owner">new owner</option><option value="gone">gone</option><option value="notfound">not found</option></select></label>
+        <label><input type="text" id="mQ" class="wide" placeholder="Search…"></label>
+      </div>
+      <div class="note" id="mSum"></div>
+      <div class="tw"><table class="ptab ftab" id="mTab"><thead></thead><tbody></tbody></table></div>
+      <button class="more" id="mMore" hidden></button>
     </div>
     <div class="pcard">
       <header><h3>Changes</h3>
@@ -1242,7 +1261,7 @@ const xyCol={k:'xy', t:'x|y', sv:r=>r.x*1000+r.y, title:'Opens the village on tr
 
 const FARM_KEY='travian-rog-x2-farms';
 const fEl=id=>document.getElementById(id);
-const FDEF={fFrom:'', fIdle:'2', fJudge:'player', fDist:'', fMin:'', fMax:'', fAlly:'nofriend', fQ:'', cSince:'1', cQ:''};
+const FDEF={fFrom:'', fIdle:'2', fJudge:'player', fDist:'', fMin:'', fMax:'', fAlly:'nofriend', fIn:'', fQ:'', cSince:'1', cQ:''};
 const FURL={fFrom:'from', fIdle:'idle', fJudge:'judge', fDist:'dist', fMin:'fmin', fMax:'fmax', fAlly:'fally', cSince:'since'};
 let fSort={k:'dist', d:1}, fLimit=200, cLimit=200, cType='new';
 function farmSave(){ const o={}; for (const k in FDEF) o[k]=fEl(k).value; try{ localStorage.setItem(FARM_KEY, JSON.stringify(o)); }catch(e){} }
@@ -1269,6 +1288,7 @@ let FCOLS=[];
 const farmCols=()=>[
   {k:'dist',t:'Dist.',num:1,f:r=>r.dist==null?'':r.dist.toFixed(1), sv:r=>r.dist??1e9, txt:r=>r.dist==null?'':r.dist.toFixed(1)},
   {k:'vname',t:'Village'}, xyCol,
+  {k:'fl',t:'Farm list',title:'Which of your pasted farm lists has this village',f:r=>r.fl?`<span class="tag new">${esc(r.fl)}</span>`:''},
   {k:'region',t:'Region'}, {k:'player',t:'Player'}, {k:'ally',t:'Alliance'},
   {k:'tribe',t:'Tribe'},
   {k:'pop',t:'Pop',num:1},
@@ -1278,19 +1298,20 @@ const farmCols=()=>[
 ];
 function farmRows(){
   const from=parseXY(fEl('fFrom').value), N_=+fEl('fIdle').value||2, judge=fEl('fJudge').value;
-  const maxD=+fEl('fDist').value||0, mn=+fEl('fMin').value||0, mx=+fEl('fMax').value||0, am=fEl('fAlly').value, q=fEl('fQ').value.trim().toLowerCase();
+  const maxD=+fEl('fDist').value||0, mn=+fEl('fMin').value||0, mx=+fEl('fMax').value||0, am=fEl('fAlly').value, fin=fEl('fIn').value, q=fEl('fQ').value.trim().toLowerCase();
   const friends=new Set(plan.alliances.filter(a=>a.kind!=='enemy').map(a=>a.tag)), enemies=new Set(plan.alliances.filter(a=>a.kind==='enemy').map(a=>a.tag));
   const out=[];
   V.forEach((v,i)=>{
     if (v[11]===1 || v[3]===5) return;                                      // Natars
     if (am==='nofriend' && friends.has(v[6])) return; if (am==='none' && v[6]) return; if (am==='enemy' && !enemies.has(v[6])) return;
     if (mn && v[7]<mn) return; if (mx && v[7]>mx) return;
+    const fl=(flAt.get(v[0]+'|'+v[1])||[]).join(', '); if (fin==='in' && !fl) return; if (fin==='out' && fl) return;
     const id = judge==='village' ? idleOf(H.vp[i]) : plIdle.get(v[11]);
     if (!id || id.days<N_) return;
     const dist = from ? Math.hypot(v[0]-from.x, v[1]-from.y) : null; if (maxD && dist!=null && dist>maxD) return;
     const p=plInfo.get(v[11]), r={dist, vname:v[4], x:v[0], y:v[1], xy:`${v[0]}|${v[1]}`, region:v[2]>=0?names[v[2]]:'', player:v[5], ally:v[6],
       tribe:(TRIBES[v[3]]||['?'])[0], pop:v[7], idle:id.days, atLeast:id.atLeast, delta:id.delta,
-      s:H.vp[i], pn:p.n, ppop:p.pop};
+      s:H.vp[i], pn:p.n, ppop:p.pop, fl};
     if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy}`.toLowerCase().includes(q)) return;
     out.push(r);
   });
@@ -1354,9 +1375,122 @@ function renderChanges(){
   fEl('cTab').tHead.innerHTML=h; fEl('cTab').tBodies[0].innerHTML=b;
   fEl('cMore').hidden=rows.length<=cLimit; fEl('cMore').textContent=`Show all ${fmt(rows.length)}`;
 }
+// ---------- my farm lists: pasted from Travian's rally point, kept in this browser only ----------
+// The farm list page has no coordinates, only "name <tab> population <tab> distance" per target.
+// Each row is matched to the village with that name at that distance from the list's own village
+// (the village list at the bottom of the page gives its coordinates); renamed villages fall back to
+// distance + population.
+const FL_KEY='travian-rog-x2-farmlists';
+let myLists=null; try{ myLists=JSON.parse(localStorage.getItem(FL_KEY)||'null'); }catch(e){}
+const byName=new Map(); for (const v of V){ const a=byName.get(v[4]); if (a) a.push(v); else byName.set(v[4],[v]); }
+function matchEntry(e, src){
+  const dist=v=>Math.hypot(v[0]-src.x, v[1]-src.y);
+  let c=(byName.get(e.n)||[]).filter(v=>Math.abs(dist(v)-e.d)<=0.15);
+  if (c.length) return {v:c.sort((a,b)=>Math.abs(a[7]-e.p)-Math.abs(b[7]-e.p))[0], how:'name'};
+  c=V.filter(v=>Math.abs(dist(v)-e.d)<=0.06 && Math.abs(v[7]-e.p)<=Math.max(10,e.p*.1));
+  return c.length===1 ? {v:c[0], how:'distance'} : null;
+}
+function parseFarmLists(text){
+  const t=text.replace(/[​-‏‪-‮⁦-⁩]/g,'').replace(/−/g,'-');
+  const lines=t.split(/\r?\n/), own=[], lists=[]; let cur=null, prev='';
+  lines.forEach((ln,i)=>{
+    const m=(lines[i+1]||'').match(/^\s*\(\s*(-?\d+)\s*\|\s*(-?\d+)\s*\)\s*$/);
+    if (m && ln.trim()) own.push({name:ln.trim(), x:+m[1], y:+m[2]});
+    if (/being raided\s*$/.test(ln)){ cur={name:prev, e:[]}; lists.push(cur); return; }
+    const p=ln.split('\t').map(s=>s.trim()).filter(Boolean);
+    if (cur && ln.includes('\t') && p.length===3 && /^\d+$/.test(p[1]) && /^\d+(\.\d+)?$/.test(p[2])) cur.e.push({n:p[0], p:+p[1], d:+p[2]});
+    if (ln.trim()) prev=ln.trim();
+  });
+  const from=parseXY(fEl('fFrom').value), srcs=own.length?own:(from?[{name:'From', ...from}]:[]);
+  for (const L of lists){
+    let best=null;                      // the list's own village: the one that matches the most rows
+    for (const s of srcs){ const n=L.e.filter(e=>matchEntry(e,s)).length; if (!best || n>best.n) best={s,n}; }
+    L.src=best?best.s:null;
+    L.e=L.e.map(e=>{ const m=L.src&&matchEntry(e,L.src); return m?{...e, x:m.v[0], y:m.v[1], u:m.v[11], how:m.how}:e; });
+  }
+  return {at:new Date().toISOString(), own:own.length, lists};
+}
+const flAt=new Map();                    // "x|y" -> [list names]
+function indexLists(){ flAt.clear(); for (const L of myLists?.lists||[]) for (const e of L.e) if (e.x!=null){ const k=e.x+'|'+e.y, a=flAt.get(k)||[]; if (!a.includes(L.name)) a.push(L.name); flAt.set(k,a); } }
+indexLists();
+const ST={inactive:['Inactive','new','The player (or village, depending on "Judged by") has not grown for the selected number of days'], growing:['Growing','warn','Grew within the selected number of days: probably active again'],
+  owner:['New owner','bad','Someone else owns this village since you pasted the list (conquered)'], gone:['Gone','bad','No longer on the map'],
+  natars:['Natars','','Natars village'], notfound:['Not found','','No village with this name at this distance; it may be an oasis, or renamed and resized']};
+const stTag=k=>`<span class="tag ${ST[k][1]}" title="${esc(ST[k][2])}">${ST[k][0]}</span>`;
+function myFarmRows(){
+  const N_=+fEl('fIdle').value||2, judge=fEl('fJudge').value, lf=fEl('mList').value, sf=fEl('mStatus').value, q=fEl('mQ').value.trim().toLowerCase(), out=[];
+  for (const L of myLists?.lists||[]){ if (lf && L.name!==lf) continue;
+    for (const e of L.e){
+      const v=e.x!=null ? vAt.get((200-e.y)*N+(e.x-MIN)) : null, i=v?V.indexOf(v):-1;
+      let st, id=null;
+      if (e.x==null) st='notfound'; else if (!v) st='gone'; else if (v[11]!==e.u) st='owner';
+      else if (v[11]===1 || v[3]===5) st='natars';
+      else { id=judge==='village'?idleOf(H.vp[i]):plIdle.get(v[11]); st=id && id.days>=N_ ? 'inactive' : 'growing'; }
+      if (sf && st!==sf && !(sf==='check' && ['growing','owner','gone','notfound'].includes(st))) continue;
+      const p=v?plInfo.get(v[11]):null;
+      const r={list:L.name, st, vname:v?v[4]:e.n, x:e.x, y:e.y, xy:e.x!=null?`${e.x}|${e.y}`:'', region:e.x!=null?regionAt(e.x,e.y):'',
+        player:v?v[5]:'', ally:v?v[6]:'', pop:v?v[7]:e.p, dist:e.d, idle:id?id.days:-1, atLeast:id?.atLeast, s:i>=0?H.vp[i]:null, ppop:p?p.pop:0};
+      if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy} ${r.list}`.toLowerCase().includes(q)) continue;
+      out.push(r);
+    } }
+  return out;
+}
+const myCols=()=>[
+  {k:'list',t:'Farm list'}, {k:'st',t:'Status',f:r=>stTag(r.st), sv:r=>Object.keys(ST).indexOf(r.st), txt:r=>ST[r.st][0]},
+  {k:'vname',t:'Village',f:r=>esc(r.vname)}, {...xyCol, f:r=>r.xy?xyCol.f(r):''},
+  {k:'region',t:'Region'}, {k:'player',t:'Player'}, {k:'ally',t:'Alliance'},
+  {k:'dist',t:'Dist.',num:1,title:"Distance from the farm list's village, as Travian shows it",f:r=>r.dist.toFixed(1)},
+  {k:'pop',t:'Pop',num:1},
+  {k:'idle',t:'No growth',num:1,f:r=>r.idle<0?'':(r.atLeast?'≥ ':'')+r.idle+' d', txt:r=>r.idle<0?'':(r.atLeast?'>=':'')+r.idle},
+  ...dayCols(HL-(+fEl('fIdle').value||2)),
+  {k:'ppop',t:'Player pop',num:1,f:r=>r.ppop?fmt(r.ppop):''},
+];
+let mSort={k:'st',d:1}, mLimit=200, mRowsCache=[], mColsCache=[];
+function renderMyFarms(){
+  const ls=myLists?.lists||[], sel=fEl('mList'), keep=sel.value;
+  sel.innerHTML='<option value="">all lists</option>'+ls.map(L=>`<option${L.name===keep?' selected':''}>${esc(L.name)}</option>`).join('');
+  if (!ls.length){ fEl('mSum').innerHTML='No farm lists yet. Click <b>Paste farm lists</b>.'; fEl('mPaste').hidden=false;
+    fEl('mTab').tHead.innerHTML=''; fEl('mTab').tBodies[0].innerHTML=''; fEl('mMore').hidden=true; return; }
+  const cnt={}; let all=0; for (const L of ls) for (const e of L.e) all++;
+  const rowsAll=(()=>{ const a=fEl('mStatus').value, b=fEl('mList').value, c=fEl('mQ').value; fEl('mStatus').value=''; fEl('mList').value=''; fEl('mQ').value='';
+    const r=myFarmRows(); fEl('mStatus').value=a; fEl('mList').value=b; fEl('mQ').value=c; return r; })();
+  for (const r of rowsAll) cnt[r.st]=(cnt[r.st]||0)+1;
+  fEl('mSum').innerHTML=`${ls.length} lists · ${fmt(all)} targets · pasted ${new Date(myLists.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · `+
+    Object.keys(ST).filter(k=>cnt[k]).map(k=>`${stTag(k)} ${cnt[k]}`).join(' &nbsp;');
+  mColsCache=myCols(); const save=fSort; fSort=mSort;
+  const rows=sortTable(myFarmRows(), mColsCache); mRowsCache=rows;
+  const [h,b]=tableHtml(mColsCache, rows, mLimit); fSort=save;
+  fEl('mTab').tHead.innerHTML=h; fEl('mTab').tBodies[0].innerHTML=b;
+  fEl('mMore').hidden=rows.length<=mLimit; fEl('mMore').textContent=`Show all ${fmt(rows.length)}`;
+}
+fEl('mPasteBtn').onclick=()=>{ fEl('mPaste').hidden=!fEl('mPaste').hidden; if (!fEl('mPaste').hidden) fEl('mText').focus(); };
+fEl('mRead').onclick=()=>{
+  const res=parseFarmLists(fEl('mText').value), n=res.lists.reduce((s,L)=>s+L.e.length,0);
+  if (!res.lists.length || !n){ fEl('mMsg').className='pmsg err'; fEl('mMsg').textContent='No farm list rows found. In the rally point, open Farm List, press Ctrl/⌘+A, Ctrl/⌘+C and paste the whole page here.'; return; }
+  if (!res.own && !parseXY(fEl('fFrom').value)){ fEl('mMsg').className='pmsg err'; fEl('mMsg').textContent="Couldn't find your villages' coordinates in the text. Copy the whole page (including the village list on the right), or enter your village in From first."; return; }
+  myLists=res; try{ localStorage.setItem(FL_KEY, JSON.stringify(myLists)); }catch(e){}
+  indexLists(); fEl('mText').value=''; fEl('mPaste').hidden=true;
+  const found=res.lists.reduce((s,L)=>s+L.e.filter(e=>e.x!=null).length,0), src=res.lists.find(L=>L.src)?.src;
+  if (src && !fEl('fFrom').value.trim()){ fEl('fFrom').value=`${src.x}|${src.y}`; farmSave(); }
+  fEl('mMsg').className='pmsg ok'; fEl('mMsg').textContent=`Read ${res.lists.length} farm lists with ${n} targets; found ${found} on the map`+(n>found?`, ${n-found} not found (oases or renamed)`:'')+'.';
+  renderFarms(); syncUrlSoon();
+};
+fEl('mClear').onclick=()=>{ if (!confirm('Forget the pasted farm lists in this browser?')) return; myLists=null; try{ localStorage.removeItem(FL_KEY); }catch(e){} indexLists(); fEl('mMsg').textContent=''; renderFarms(); };
+for (const id of ['mList','mStatus']) fEl(id).addEventListener('change',()=>{ mLimit=200; renderMyFarms(); });
+fEl('mQ').addEventListener('input',()=>{ mLimit=200; renderMyFarms(); });
+fEl('mMore').onclick=()=>{ mLimit=1e9; renderMyFarms(); };
+fEl('mTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; mSort = mSort.k===k ? {k, d:-mSort.d} : {k, d:['pop','idle','ppop'].includes(k)?-1:1}; renderMyFarms(); };
+fEl('mTab').tBodies[0].onclick=e=>{ if (e.target.closest('a')) return; const tr=e.target.closest('tr.fr'); if (tr) gotoXY(+tr.dataset.x, +tr.dataset.y); };
+fEl('mCopy').onclick=async e=>{
+  const L=[mColsCache.map(c=>c.t).join('\t'), ...mRowsCache.map(r=>mColsCache.map(c=>c.txt?c.txt(r):r[c.k]).join('\t'))].join('\n');
+  const btn=e.currentTarget, old=btn.textContent;
+  try{ await navigator.clipboard.writeText(L); btn.textContent='✓ Copied'; }catch(_){ window.prompt('Copy:', L); }
+  setTimeout(()=>btn.textContent=old,1600);
+};
+
 function renderFarms(){
   fEl('fHist').textContent = H.dates.length ? `${H.dates.length} daily snapshot${H.dates.length>1?'s':''}: ${shortDate(H.dates[0])} – ${shortDate(H.dates[HL])} · map.sql of __DATE__` : '';
-  renderFarmTable(); renderChanges();
+  renderFarmTable(); renderMyFarms(); renderChanges();
 }
 function farmChanged(){ fLimit=200; cLimit=200; farmSave(); renderFarms(); syncUrlSoon(); }
 for (const id of Object.keys(FDEF)) fEl(id).addEventListener(fEl(id).tagName==='SELECT'?'change':'input', farmChanged);
