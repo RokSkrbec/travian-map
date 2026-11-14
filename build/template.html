@@ -174,7 +174,7 @@
   .ftab tr.fr { cursor:pointer; } .ftab tr.fr:hover td { background:#232831; }
   .ftab .tr { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
   .ftab .down { color:#ff8a80; } .ftab .up { color:#7fd99a; }
-  .ftab th.day, .ftab td.day { min-width:52px; } .ftab th.day { font-size:11.5px; }
+  .ftab th.day, .ftab td.day { min-width:84px; } .ftab th.day { font-size:11.5px; }
   .ftab a.tv { color:var(--accent); text-decoration:none; } .ftab a.tv:hover { text-decoration:underline; }
   .tag { font-size:10.5px; border:1px solid #3a414d; border-radius:3px; padding:0 4px; color:var(--muted); margin-left:4px; }
   .tag.new { color:#7fd99a; border-color:#2f6a3f; }
@@ -1225,14 +1225,16 @@ const plIdle=new Map(), plInfo=new Map();
 for (const v of V){ let p=plInfo.get(v[11]); if(!p){ p={n:0,pop:0}; plInfo.set(v[11],p); } p.n++; p.pop+=v[7]; }
 for (const uid of plInfo.keys()) plIdle.set(uid, idleOf(H.pp[uid]));
 const regionAt=(x,y)=>{ const r=grid[(200-y)*N+(x-MIN)]; return r>=0?names[r]:''; };
-// one column per snapshot day: the change from the day before (hover for the populations)
-const dDelta=(s,k)=>s && s[k]>=0 && s[k-1]>=0 ? s[k]-s[k-1] : null;
-function dayCols(from, what='Population'){ const out=[];
-  for (let k=Math.max(1,from,HL-6);k<=HL;k++) out.push({k:'d'+k, t:shortDate(H.dates[k]), num:1, day:1,
-    title:`${what} change from ${shortDate(H.dates[k-1])} to ${shortDate(H.dates[k])}`,
-    sv:r=>dDelta(r.s,k)??-1e9, txt:r=>dDelta(r.s,k)??'',
-    f:r=>{ const d=dDelta(r.s,k); if (d==null) return r.s&&r.s[k]>=0?'<span class="tr">new</span>':'';
-      return `<span class="${d<0?'down':d>0?'up':'tr'}" title="${r.s[k-1]} → ${r.s[k]}">${d>0?'+':d<0?'−':''}${fmt(Math.abs(d))}</span>`; }});
+// one column per snapshot day: that day's village population, with the change from the day before in ()
+const dDelta=(s,k)=>s && k>0 && s[k]>=0 && s[k-1]>=0 ? s[k]-s[k-1] : null;
+function dayCols(from){ const out=[];
+  for (let k=Math.max(0,from);k<=HL;k++) out.push({k:'d'+k, t:shortDate(H.dates[k]), num:1, day:1,
+    title:`Village population on ${shortDate(H.dates[k])}`+(k>0?` (change from ${shortDate(H.dates[k-1])})`:''),
+    sv:r=>dDelta(r.s,k)??(r.s&&r.s[k]>=0?0:-1e9),
+    txt:r=>r.s&&r.s[k]>=0 ? r.s[k]+(dDelta(r.s,k)!=null?` (${dDelta(r.s,k)>0?'+':''}${dDelta(r.s,k)})`:'') : '',
+    f:r=>{ if (!r.s || r.s[k]<0) return ''; const d=dDelta(r.s,k);
+      const ch = d==null ? (k>0?' <span class="tr">(new)</span>':'') : ` <span class="${d<0?'down':d>0?'up':'tr'}">(${d>0?'+':d<0?'−':''}${fmt(Math.abs(d))})</span>`;
+      return fmt(r.s[k])+ch; }});
   return out; }
 const TRAVIAN='https://rog.x2.europe.travian.com';
 const xyCol={k:'xy', t:'x|y', sv:r=>r.x*1000+r.y, title:'Opens the village on travian.com in a new tab',
@@ -1271,7 +1273,7 @@ const farmCols=()=>[
   {k:'tribe',t:'Tribe'},
   {k:'pop',t:'Pop',num:1},
   {k:'idle',t:'No growth',num:1,f:r=>(r.atLeast?'≥ ':'')+r.idle+' d', sv:r=>r.idle+(r.atLeast?.5:0), txt:r=>(r.atLeast?'>=':'')+r.idle},
-  ...dayCols(1, fEl('fJudge').value==='village'?'Village population':"Player's total population"),
+  ...dayCols(HL-(+fEl('fIdle').value||2)),
   {k:'pn',t:'Player vill.',num:1}, {k:'ppop',t:'Player pop',num:1},
 ];
 function farmRows(){
@@ -1288,7 +1290,7 @@ function farmRows(){
     const dist = from ? Math.hypot(v[0]-from.x, v[1]-from.y) : null; if (maxD && dist!=null && dist>maxD) return;
     const p=plInfo.get(v[11]), r={dist, vname:v[4], x:v[0], y:v[1], xy:`${v[0]}|${v[1]}`, region:v[2]>=0?names[v[2]]:'', player:v[5], ally:v[6],
       tribe:(TRIBES[v[3]]||['?'])[0], pop:v[7], idle:id.days, atLeast:id.atLeast, delta:id.delta,
-      s:judge==='village'?H.vp[i]:H.pp[v[11]], pn:p.n, ppop:p.pop};
+      s:H.vp[i], pn:p.n, ppop:p.pop};
     if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy}`.toLowerCase().includes(q)) return;
     out.push(r);
   });
@@ -1346,7 +1348,7 @@ function renderChanges(){
   fEl('cSum').innerHTML=Object.entries(CTYPES).map(([k,t])=>`<button data-ct="${k}" class="${k===cType?'on':''}">${t} <b>${fmt(all[k].length)}</b></button>`).join('');
   const newPl=new Set(all.new.filter(r=>r.extra).map(r=>r.player)).size;
   fEl('cNote').textContent = cType==='new' ? `${newPl} new players.` : cType==='gone' ? 'Villages that are no longer on the map (destroyed or deleted).' : cType==='conq' ? 'Villages that changed owner.' : cType==='drop' ? 'Villages whose population went down (catapults, conquest, or the owner demolishing). Lost = all the day-to-day drops added up; % = of its highest population in that time.' : 'Players who joined, left or switched alliance.';
-  const cols=cType==='drop' ? [...CCOLS.drop, ...dayCols(HL-(+fEl('cSince').value||1)+1, 'Village population')] : CCOLS[cType], save=fSort; fSort=cSort;
+  const cols=cType==='drop' ? [...CCOLS.drop, ...dayCols(HL-(+fEl('cSince').value||1))] : CCOLS[cType], save=fSort; fSort=cSort;
   const rows=sortTable(all[cType], cols.map(c=>c.k==='date'?{...c, sv:r=>r.day}:c));
   const [h,b]=tableHtml(cols, rows, cLimit); fSort=save;
   fEl('cTab').tHead.innerHTML=h; fEl('cTab').tBodies[0].innerHTML=b;
