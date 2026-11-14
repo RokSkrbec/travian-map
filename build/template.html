@@ -174,6 +174,8 @@
   .ftab tr.fr { cursor:pointer; } .ftab tr.fr:hover td { background:#232831; }
   .ftab .tr { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
   .ftab .down { color:#ff8a80; } .ftab .up { color:#7fd99a; }
+  .ftab th.day, .ftab td.day { min-width:52px; } .ftab th.day { font-size:11.5px; }
+  .ftab a.tv { color:var(--accent); text-decoration:none; } .ftab a.tv:hover { text-decoration:underline; }
   .tag { font-size:10.5px; border:1px solid #3a414d; border-radius:3px; padding:0 4px; color:var(--muted); margin-left:4px; }
   .tag.new { color:#7fd99a; border-color:#2f6a3f; }
   .csum { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0; }
@@ -1223,7 +1225,18 @@ const plIdle=new Map(), plInfo=new Map();
 for (const v of V){ let p=plInfo.get(v[11]); if(!p){ p={n:0,pop:0}; plInfo.set(v[11],p); } p.n++; p.pop+=v[7]; }
 for (const uid of plInfo.keys()) plIdle.set(uid, idleOf(H.pp[uid]));
 const regionAt=(x,y)=>{ const r=grid[(200-y)*N+(x-MIN)]; return r>=0?names[r]:''; };
-const trendTxt=s=>{ if(!s) return ''; const a=s.slice(Math.max(0,HL-3)).filter(x=>x>=0); return a.join(' → '); };
+// one column per snapshot day: the change from the day before (hover for the populations)
+const dDelta=(s,k)=>s && s[k]>=0 && s[k-1]>=0 ? s[k]-s[k-1] : null;
+function dayCols(from, what='Population'){ const out=[];
+  for (let k=Math.max(1,from,HL-6);k<=HL;k++) out.push({k:'d'+k, t:shortDate(H.dates[k]), num:1, day:1,
+    title:`${what} change from ${shortDate(H.dates[k-1])} to ${shortDate(H.dates[k])}`,
+    sv:r=>dDelta(r.s,k)??-1e9, txt:r=>dDelta(r.s,k)??'',
+    f:r=>{ const d=dDelta(r.s,k); if (d==null) return r.s&&r.s[k]>=0?'<span class="tr">new</span>':'';
+      return `<span class="${d<0?'down':d>0?'up':'tr'}" title="${r.s[k-1]} → ${r.s[k]}">${d>0?'+':d<0?'−':''}${fmt(Math.abs(d))}</span>`; }});
+  return out; }
+const TRAVIAN='https://rog.x2.europe.travian.com';
+const xyCol={k:'xy', t:'x|y', sv:r=>r.x*1000+r.y, title:'Opens the village on travian.com in a new tab',
+  f:r=>`<a class="tv" href="${TRAVIAN}/position_details.php?x=${r.x}&amp;y=${r.y}" target="_blank" rel="noopener">${r.x}|${r.y} ↗</a>`};
 
 const FARM_KEY='travian-rog-x2-farms';
 const fEl=id=>document.getElementById(id);
@@ -1250,14 +1263,15 @@ function sortTable(rows, cols){
   const c=cols.find(c=>c.k===fSort.k)||cols[0], key=c.sv||(r=>r[c.k]);
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (typeof x==='string' ? x.localeCompare(y) : x-y)*fSort.d; });
 }
-const FCOLS=[
-  {k:'dist',t:'Dist.',num:1,f:r=>r.dist==null?'':r.dist.toFixed(1), sv:r=>r.dist??1e9},
-  {k:'vname',t:'Village'}, {k:'xy',t:'x|y', sv:r=>r.x*1000+r.y},
+let FCOLS=[];
+const farmCols=()=>[
+  {k:'dist',t:'Dist.',num:1,f:r=>r.dist==null?'':r.dist.toFixed(1), sv:r=>r.dist??1e9, txt:r=>r.dist==null?'':r.dist.toFixed(1)},
+  {k:'vname',t:'Village'}, xyCol,
   {k:'region',t:'Region'}, {k:'player',t:'Player'}, {k:'ally',t:'Alliance'},
   {k:'tribe',t:'Tribe'},
   {k:'pop',t:'Pop',num:1},
-  {k:'idle',t:'No growth',num:1,f:r=>(r.atLeast?'≥ ':'')+r.idle+' d', sv:r=>r.idle+(r.atLeast?.5:0)},
-  {k:'trend',t:'Last days',f:r=>`<span class="tr ${r.delta<0?'down':''}">${esc(r.trend)}</span>`, sv:r=>r.delta},
+  {k:'idle',t:'No growth',num:1,f:r=>(r.atLeast?'≥ ':'')+r.idle+' d', sv:r=>r.idle+(r.atLeast?.5:0), txt:r=>(r.atLeast?'>=':'')+r.idle},
+  ...dayCols(1, fEl('fJudge').value==='village'?'Village population':"Player's total population"),
   {k:'pn',t:'Player vill.',num:1}, {k:'ppop',t:'Player pop',num:1},
 ];
 function farmRows(){
@@ -1274,22 +1288,22 @@ function farmRows(){
     const dist = from ? Math.hypot(v[0]-from.x, v[1]-from.y) : null; if (maxD && dist!=null && dist>maxD) return;
     const p=plInfo.get(v[11]), r={dist, vname:v[4], x:v[0], y:v[1], xy:`${v[0]}|${v[1]}`, region:v[2]>=0?names[v[2]]:'', player:v[5], ally:v[6],
       tribe:(TRIBES[v[3]]||['?'])[0], pop:v[7], idle:id.days, atLeast:id.atLeast, delta:id.delta,
-      trend:trendTxt(judge==='village'?H.vp[i]:H.pp[v[11]]), pn:p.n, ppop:p.pop};
+      s:judge==='village'?H.vp[i]:H.pp[v[11]], pn:p.n, ppop:p.pop};
     if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy}`.toLowerCase().includes(q)) return;
     out.push(r);
   });
   return out;
 }
 function tableHtml(cols, rows, limit){
-  const th=cols.map(c=>`<th data-k="${c.k}"${c.num?' class="num'+(fSort.k===c.k?' sorted':'')+'"':(fSort.k===c.k?' class="sorted"':'')}>${c.t}${fSort.k===c.k?(fSort.d>0?' ▲':' ▼'):''}</th>`).join('');
-  const tb=rows.slice(0,limit).map(r=>`<tr${r.xy?` class="fr" data-x="${r.x}" data-y="${r.y}"`:''}>`+cols.map(c=>`<td${c.num?' class="num"':''}>${c.f?c.f(r):esc(r[c.k]??'')}</td>`).join('')+'</tr>').join('');
+  const th=cols.map(c=>`<th data-k="${c.k}"${c.title?` title="${esc(c.title)}"`:''} class="${[c.num?'num':'',c.day?'day':'',fSort.k===c.k?'sorted':''].join(' ').trim()}">${c.t}${fSort.k===c.k?(fSort.d>0?' ▲':' ▼'):''}</th>`).join('');
+  const tb=rows.slice(0,limit).map(r=>`<tr${r.xy?` class="fr" data-x="${r.x}" data-y="${r.y}"`:''}>`+cols.map(c=>`<td class="${[c.num?'num':'',c.day?'day':''].join(' ').trim()}">${c.f?c.f(r):esc(r[c.k]??'')}</td>`).join('')+'</tr>').join('');
   return [`<tr>${th}</tr>`, tb];
 }
 let fRowsCache=[];
 function renderFarmTable(){
   if (HL<1){ fEl('fNote').innerHTML=`Tracking started on <b>${shortDate(H.dates[0]||new Date().toISOString())}</b>. Each night's map.sql is saved, so players who stop growing show up here once there are at least two days of history.`;
     fEl('fTab').tHead.innerHTML=''; fEl('fTab').tBodies[0].innerHTML=''; fEl('fMore').hidden=true; return; }
-  const rows=sortTable(farmRows(), FCOLS); fRowsCache=rows;
+  FCOLS=farmCols(); const rows=sortTable(farmRows(), FCOLS); fRowsCache=rows;
   const from=parseXY(fEl('fFrom').value), N_=+fEl('fIdle').value;
   const pl=new Set(rows.map(r=>r.player)).size;
   fEl('fNote').innerHTML=`${fmt(rows.length)} villages of ${fmt(pl)} players`+(HL+1<=N_?` · <span class="warn">only ${HL+1} days of history so far, so nobody can show ${N_}+ days yet</span>`:'')+
@@ -1300,11 +1314,11 @@ function renderFarmTable(){
 const CTYPES={new:'New villages', conq:'Conquered', gone:'Gone', drop:'Pop drops', ally:'Alliance changes'};
 const allyTxt=t=>t?`[${esc(t)}]`:'<span class="note">none</span>';
 const CCOLS={
-  new:[{k:'date',t:'Day'},{k:'vname',t:'Village',f:r=>esc(r.vname)+(r.extra?'<span class="tag new">new player</span>':'')},{k:'xy',t:'x|y',sv:r=>r.x*1000+r.y},{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},{k:'tribe',t:'Tribe'},{k:'pop',t:'Pop',num:1}],
-  conq:[{k:'date',t:'Day'},{k:'vname',t:'Village'},{k:'xy',t:'x|y',sv:r=>r.x*1000+r.y},{k:'region',t:'Region'},{k:'extra',t:'From'},{k:'player',t:'To'},{k:'ally',t:'Alliance'},{k:'pop',t:'Pop',num:1}],
-  gone:[{k:'date',t:'Day'},{k:'vname',t:'Village',f:r=>esc(r.vname)+(r.extra?'<span class="tag">player gone</span>':'')},{k:'xy',t:'x|y',sv:r=>r.x*1000+r.y},{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},{k:'pop',t:'Last pop',num:1}],
-  drop:[{k:'date',t:'Last drop'},{k:'vname',t:'Village'},{k:'xy',t:'x|y',sv:r=>r.x*1000+r.y},{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},
-    {k:'trend',t:'Pop',f:r=>`<span class="tr">${esc(r.trend)}</span>`, sv:r=>r.pop},{k:'extra',t:'Lost',num:1,f:r=>`<span class="down">−${fmt(r.extra)}</span>`},{k:'pct',t:'%',num:1,f:r=>`${r.pct}%`}],
+  new:[{k:'date',t:'Day'},{k:'vname',t:'Village',f:r=>esc(r.vname)+(r.extra?'<span class="tag new">new player</span>':'')},xyCol,{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},{k:'tribe',t:'Tribe'},{k:'pop',t:'Pop',num:1}],
+  conq:[{k:'date',t:'Day'},{k:'vname',t:'Village'},xyCol,{k:'region',t:'Region'},{k:'extra',t:'From'},{k:'player',t:'To'},{k:'ally',t:'Alliance'},{k:'pop',t:'Pop',num:1}],
+  gone:[{k:'date',t:'Day'},{k:'vname',t:'Village',f:r=>esc(r.vname)+(r.extra?'<span class="tag">player gone</span>':'')},xyCol,{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},{k:'pop',t:'Last pop',num:1}],
+  drop:[{k:'date',t:'Last drop'},{k:'vname',t:'Village'},xyCol,{k:'region',t:'Region'},{k:'player',t:'Player'},{k:'ally',t:'Alliance'},
+    {k:'pop',t:'Pop',num:1},{k:'extra',t:'Lost',num:1,f:r=>`<span class="down">−${fmt(r.extra)}</span>`},{k:'pct',t:'%',num:1,f:r=>`${r.pct}%`}],
   ally:[{k:'date',t:'Day'},{k:'player',t:'Player'},{k:'extra',t:'From',f:r=>allyTxt(r.extra)},{k:'ally',t:'To',f:r=>allyTxt(r.ally)},{k:'pop',t:'Player pop',num:1}],
 };
 function changeRows(){
@@ -1315,7 +1329,7 @@ function changeRows(){
     for (let k=st;k<=HL;k++){ if (s[k]<0) continue; if (k>st && s[k-1]>=0 && s[k]<s[k-1]){ drop+=s[k-1]-s[k]; last=k; } }
     if (!drop) return;
     const r={type:'drop', date:shortDate(H.dates[last]), day:last, x:v[0], y:v[1], xy:`${v[0]}|${v[1]}`, region:v[2]>=0?names[v[2]]:'', vname:v[4], player:v[5], ally:v[6],
-      pop:v[7], extra:drop, pct:Math.min(100,Math.round(100*drop/Math.max(...s.slice(st)))), trend:s.slice(st).filter(x=>x>=0).join(' → ')};
+      pop:v[7], extra:drop, pct:Math.min(100,Math.round(100*drop/Math.max(...s.slice(st)))), s};
     if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy}`.toLowerCase().includes(q)) return;
     out.drop.push(r); });
   for (const e of H.ev){ if (e[1]<=HL-since) continue;
@@ -1332,7 +1346,7 @@ function renderChanges(){
   fEl('cSum').innerHTML=Object.entries(CTYPES).map(([k,t])=>`<button data-ct="${k}" class="${k===cType?'on':''}">${t} <b>${fmt(all[k].length)}</b></button>`).join('');
   const newPl=new Set(all.new.filter(r=>r.extra).map(r=>r.player)).size;
   fEl('cNote').textContent = cType==='new' ? `${newPl} new players.` : cType==='gone' ? 'Villages that are no longer on the map (destroyed or deleted).' : cType==='conq' ? 'Villages that changed owner.' : cType==='drop' ? 'Villages whose population went down (catapults, conquest, or the owner demolishing). Lost = all the day-to-day drops added up; % = of its highest population in that time.' : 'Players who joined, left or switched alliance.';
-  const cols=CCOLS[cType], save=fSort; fSort=cSort;
+  const cols=cType==='drop' ? [...CCOLS.drop, ...dayCols(HL-(+fEl('cSince').value||1)+1, 'Village population')] : CCOLS[cType], save=fSort; fSort=cSort;
   const rows=sortTable(all[cType], cols.map(c=>c.k==='date'?{...c, sv:r=>r.day}:c));
   const [h,b]=tableHtml(cols, rows, cLimit); fSort=save;
   fEl('cTab').tHead.innerHTML=h; fEl('cTab').tBodies[0].innerHTML=b;
@@ -1349,9 +1363,9 @@ fEl('cMore').onclick=()=>{ cLimit=1e9; renderChanges(); };
 fEl('cSum').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; cType=b.dataset.ct; cSort=cType==='drop'?{k:'extra',d:-1}:{k:'date',d:-1}; cLimit=200; renderChanges(); };
 fEl('fTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; fSort = fSort.k===k ? {k, d:-fSort.d} : {k, d:['pop','idle','pn','ppop'].includes(k)?-1:1}; renderFarmTable(); };
 fEl('cTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; cSort = cSort.k===k ? {k, d:-cSort.d} : {k, d:['pop','extra','pct','trend'].includes(k)?-1:1}; renderChanges(); };
-for (const t of ['fTab','cTab']) fEl(t).tBodies[0].onclick=e=>{ const tr=e.target.closest('tr.fr'); if (tr) gotoXY(+tr.dataset.x, +tr.dataset.y); };
+for (const t of ['fTab','cTab']) fEl(t).tBodies[0].onclick=e=>{ if (e.target.closest('a')) return; const tr=e.target.closest('tr.fr'); if (tr) gotoXY(+tr.dataset.x, +tr.dataset.y); };
 fEl('fCopy').onclick=async e=>{
-  const L=[FCOLS.map(c=>c.t).join('\t'), ...fRowsCache.map(r=>FCOLS.map(c=>c.k==='idle'?(r.atLeast?'>=':'')+r.idle:c.k==='dist'?(r.dist==null?'':r.dist.toFixed(1)):r[c.k]).join('\t'))].join('\n');
+  const L=[FCOLS.map(c=>c.t).join('\t'), ...fRowsCache.map(r=>FCOLS.map(c=>c.txt?c.txt(r):r[c.k]).join('\t'))].join('\n');
   const btn=e.currentTarget, old=btn.textContent;
   try{ await navigator.clipboard.writeText(L); btn.textContent='✓ Copied'; }catch(_){ window.prompt('Copy:', L); }
   setTimeout(()=>btn.textContent=old,1600);
