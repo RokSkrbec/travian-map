@@ -24,7 +24,7 @@ Every build saves a compact copy of that day's `map.sql` (village, owner, popula
 - **My farms**: paste the rally point's Farm List page (select all, copy) and the page reads every list. The page text has no coordinates, so each target is matched to the village with that name at that distance from the list's own village (taken from the village list on the same page). Each target gets a status: inactive, growing, new owner, gone, or not found (oases, renamed villages). Potential farms and Changes get a Farm list column, and Potential farms an "in / not in my farm lists" filter. The lists stay in that browser only (localStorage) and the pasted text isn't kept.
 - **Changes**: new villages (and new players), conquered villages, villages that disappeared, population drops (catapults, conquest; summed per village, with % of its peak), and alliance joins/leaves/switches since a chosen day.
 
-Tracking started on 12 Nov 2026, so the history only goes back to then.
+Travian makes `map.sql` at about midnight UTC, so the file downloaded on a day shows the world at the end of the day before; the tab labels every date that way (the snapshot `history/2026-11-12.json` is the end of 11 Nov). Tracking started with that first snapshot, so the history only goes back to then. The last village clicked in any of the tables (its row or its Travian link) stays highlighted, remembered per browser.
 
 ## Files
 

@@ -180,6 +180,7 @@
   .ftab th[data-k] { cursor:pointer; user-select:none; } .ftab th[data-k]:hover { color:var(--text); }
   .ftab th.sorted { color:var(--accent); }
   .ftab tr.fr { cursor:pointer; } .ftab tr.fr:hover td { background:#232831; }
+  .ftab tr.fr.last td { background:#2a3a52; } .ftab tr.fr.last td:first-child { box-shadow:inset 3px 0 0 var(--accent); }
   .ftab .tr { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
   .ftab .down { color:#ff8a80; } .ftab .up { color:#7fd99a; }
   .ftab th.day, .ftab td.day { min-width:84px; } .ftab th.day { font-size:11.5px; }
@@ -1240,6 +1241,8 @@ const H = DATA.h || {dates:[], vp:[], pp:{}, ev:[]};
 const HL = H.dates.length - 1;                                   // index of today's snapshot
 const dayNum = d => Date.UTC(+d.slice(0,4), +d.slice(5,7)-1, +d.slice(8,10)) / 864e5;
 const shortDate = d => new Date(dayNum(d)*864e5).toLocaleDateString('en-GB', {day:'numeric', month:'short', timeZone:'UTC'});
+// map.sql is generated around midnight UTC, so the snapshot downloaded on day D shows the world at the end of D-1
+const dayOf = d => new Date((dayNum(d)-1)*864e5).toLocaleDateString('en-GB', {day:'numeric', month:'short', timeZone:'UTC'});
 // days without growth: from the last snapshot where the population went up to today.
 // If it never went up in the history we have, it's at least the whole span (atLeast=true).
 function idleOf(s){
@@ -1255,8 +1258,8 @@ const regionAt=(x,y)=>{ const r=grid[(200-y)*N+(x-MIN)]; return r>=0?names[r]:''
 // one column per snapshot day: that day's village population, with the change from the day before in ()
 const dDelta=(s,k)=>s && k>0 && s[k]>=0 && s[k-1]>=0 ? s[k]-s[k-1] : null;
 function dayCols(from){ const out=[];
-  for (let k=Math.max(0,from);k<=HL;k++) out.push({k:'d'+k, t:shortDate(H.dates[k]), num:1, day:1,
-    title:`Village population on ${shortDate(H.dates[k])}`+(k>0?` (change from ${shortDate(H.dates[k-1])})`:''),
+  for (let k=Math.max(0,from);k<=HL;k++) out.push({k:'d'+k, t:dayOf(H.dates[k]), num:1, day:1,
+    title:`Village population at the end of ${dayOf(H.dates[k])}`+(k>0?` (change during that day)`:''),
     sv:r=>dDelta(r.s,k)??(r.s&&r.s[k]>=0?0:-1e9),
     txt:r=>r.s&&r.s[k]>=0 ? r.s[k]+(dDelta(r.s,k)!=null?` (${dDelta(r.s,k)>0?'+':''}${dDelta(r.s,k)})`:'') : '',
     f:r=>{ if (!r.s || r.s[k]<0) return ''; const d=dDelta(r.s,k);
@@ -1276,7 +1279,7 @@ function farmSave(){ const o={}; for (const k in FDEF) o[k]=fEl(k).value; try{ l
 function farmUrl(q){ for (const [id,k] of Object.entries(FURL)){ const v=fEl(id).value.trim(); if (v && v!==FDEF[id]) q.set(k,v); } }
 function applyFarmUrl(){
   const sel=fEl('cSince'); sel.innerHTML='';
-  for (let n=1;n<=Math.max(1,HL);n++) sel.add(new Option(n===1?'yesterday':`${n} days ago`+(H.dates[HL-n]?` (${shortDate(H.dates[HL-n])})`:''), String(n)));
+  for (let n=1;n<=Math.max(1,HL);n++) sel.add(new Option((H.dates[HL-n]?`end of ${dayOf(H.dates[HL-n])} `:'')+`(${n} day${n>1?'s':''})`, String(n)));
   let o={}; try{ o=JSON.parse(localStorage.getItem(FARM_KEY)||'{}'); }catch(e){}
   const q=new URLSearchParams(location.search);
   for (const id in FDEF){ const k=FURL[id]; fEl(id).value = (k && q.has(k)) ? q.get(k) : (o[id] ?? FDEF[id]); }
@@ -1293,6 +1296,7 @@ function sortTable(rows, cols){
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (typeof x==='string' ? x.localeCompare(y) : x-y)*fSort.d; });
 }
 let FCOLS=[];
+const LAST_KEY='travian-rog-x2-lastrow'; let lastRow=''; try{ lastRow=localStorage.getItem(LAST_KEY)||''; }catch(e){}
 const flCol={k:'fl',t:'Farm list',title:'Which of your pasted farm lists has this village',f:r=>r.fl?`<span class="tag new">${esc(r.fl)}</span>`:''};
 const flOf=(x,y)=>(flAt.get(x+'|'+y)||[]).join(', ');
 const farmCols=()=>[
@@ -1329,12 +1333,12 @@ function farmRows(){
 }
 function tableHtml(cols, rows, limit){
   const th=cols.map(c=>`<th data-k="${c.k}"${c.title?` title="${esc(c.title)}"`:''} class="${[c.num?'num':'',c.day?'day':'',fSort.k===c.k?'sorted':''].join(' ').trim()}">${c.t}${fSort.k===c.k?(fSort.d>0?' ▲':' ▼'):''}</th>`).join('');
-  const tb=rows.slice(0,limit).map(r=>`<tr${r.xy?` class="fr" data-x="${r.x}" data-y="${r.y}"`:''}>`+cols.map(c=>`<td class="${[c.num?'num':'',c.day?'day':''].join(' ').trim()}">${c.f?c.f(r):esc(r[c.k]??'')}</td>`).join('')+'</tr>').join('');
+  const tb=rows.slice(0,limit).map(r=>`<tr${r.xy?` class="fr${r.x+'|'+r.y===lastRow?' last':''}" data-x="${r.x}" data-y="${r.y}"`:''}>`+cols.map(c=>`<td class="${[c.num?'num':'',c.day?'day':''].join(' ').trim()}">${c.f?c.f(r):esc(r[c.k]??'')}</td>`).join('')+'</tr>').join('');
   return [`<tr>${th}</tr>`, tb];
 }
 let fRowsCache=[];
 function renderFarmTable(){
-  if (HL<1){ fEl('fNote').innerHTML=`Tracking started on <b>${shortDate(H.dates[0]||new Date().toISOString())}</b>. Each night's map.sql is saved, so players who stop growing show up here once there are at least two days of history.`;
+  if (HL<1){ fEl('fNote').innerHTML=`Tracking started with the world at the end of <b>${dayOf(H.dates[0]||new Date().toISOString())}</b>. Each night's map.sql is saved, so players who stop growing show up here once there are at least two days of history.`;
     fEl('fTab').tHead.innerHTML=''; fEl('fTab').tBodies[0].innerHTML=''; fEl('fMore').hidden=true; return; }
   FCOLS=farmCols(); const rows=sortTable(farmRows(), FCOLS); fRowsCache=rows;
   const from=parseXY(fEl('fFrom').value), N_=+fEl('fIdle').value;
@@ -1361,12 +1365,12 @@ function changeRows(){
   V.forEach((v,i)=>{ const s=H.vp[i]; if (!s) return; let drop=0, last=-1;
     for (let k=st;k<=HL;k++){ if (s[k]<0) continue; if (k>st && s[k-1]>=0 && s[k]<s[k-1]){ drop+=s[k-1]-s[k]; last=k; } }
     if (!drop) return;
-    const r={type:'drop', date:shortDate(H.dates[last]), day:last, x:v[0], y:v[1], xy:`${v[0]}|${v[1]}`, region:v[2]>=0?names[v[2]]:'', vname:v[4], player:v[5], ally:v[6],
+    const r={type:'drop', date:dayOf(H.dates[last]), day:last, x:v[0], y:v[1], xy:`${v[0]}|${v[1]}`, region:v[2]>=0?names[v[2]]:'', vname:v[4], player:v[5], ally:v[6],
       pop:v[7], fl:flOf(v[0],v[1]), extra:drop, pct:Math.min(100,Math.round(100*drop/Math.max(...s.slice(st)))), s};
     if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy}`.toLowerCase().includes(q)) return;
     out.drop.push(r); });
   for (const e of H.ev){ if (e[1]<=HL-since) continue;
-    const r={type:e[0], date:shortDate(H.dates[e[1]]), day:e[1], x:e[2], y:e[3], xy:e[0]==='ally'?'':`${e[2]}|${e[3]}`, region:e[0]==='ally'?'':regionAt(e[2],e[3]),
+    const r={type:e[0], date:dayOf(H.dates[e[1]]), day:e[1], x:e[2], y:e[3], xy:e[0]==='ally'?'':`${e[2]}|${e[3]}`, region:e[0]==='ally'?'':regionAt(e[2],e[3]),
       vname:e[4], player:e[5], ally:e[6], pop:e[7], tribe:(TRIBES[e[8]]||[''])[0], extra:e[9], fl:e[0]==='ally'?'':flOf(e[2],e[3])};
     if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy} ${r.extra}`.toLowerCase().includes(q)) continue;
     out[r.type]?.push(r); }
@@ -1490,7 +1494,6 @@ for (const id of ['mList','mStatus']) fEl(id).addEventListener('change',()=>{ mL
 fEl('mQ').addEventListener('input',()=>{ mLimit=200; renderMyFarms(); });
 fEl('mMore').onclick=()=>{ mLimit=1e9; renderMyFarms(); };
 fEl('mTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; mSort = mSort.k===k ? {k, d:-mSort.d} : {k, d:['pop','idle','ppop'].includes(k)?-1:1}; renderMyFarms(); };
-fEl('mTab').tBodies[0].onclick=e=>{ if (e.target.closest('a')) return; const tr=e.target.closest('tr.fr'); if (tr) gotoXY(+tr.dataset.x, +tr.dataset.y); };
 fEl('mCopy').onclick=async e=>{
   const L=[mColsCache.map(c=>c.t).join('\t'), ...mRowsCache.map(r=>mColsCache.map(c=>c.txt?c.txt(r):r[c.k]).join('\t'))].join('\n');
   const btn=e.currentTarget, old=btn.textContent;
@@ -1510,7 +1513,7 @@ document.querySelectorAll('.fcard').forEach(card=>{
   });
 });
 function renderFarms(){
-  fEl('fHist').textContent = H.dates.length ? `${H.dates.length} daily snapshot${H.dates.length>1?'s':''}: ${shortDate(H.dates[0])} – ${shortDate(H.dates[HL])} · map.sql of __DATE__` : '';
+  fEl('fHist').textContent = H.dates.length ? `Data as of the end of ${dayOf(H.dates[HL])} (map.sql is made at midnight UTC; downloaded __DATE__) · ${H.dates.length} daily snapshot${H.dates.length>1?'s':''}, end of ${dayOf(H.dates[0])} – ${dayOf(H.dates[HL])}` : '';
   renderFarmTable(); renderMyFarms(); renderChanges();
 }
 function farmChanged(){ fLimit=200; cLimit=200; farmSave(); renderFarms(); syncUrlSoon(); }
@@ -1520,7 +1523,16 @@ fEl('cMore').onclick=()=>{ cLimit=1e9; renderChanges(); };
 fEl('cSum').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; cType=b.dataset.ct; cSort=cType==='drop'?{k:'extra',d:-1}:{k:'date',d:-1}; cLimit=200; renderChanges(); };
 fEl('fTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; fSort = fSort.k===k ? {k, d:-fSort.d} : {k, d:['pop','idle','pn','ppop'].includes(k)?-1:1}; renderFarmTable(); };
 fEl('cTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; cSort = cSort.k===k ? {k, d:-cSort.d} : {k, d:['pop','extra','pct','trend'].includes(k)?-1:1}; renderChanges(); };
-for (const t of ['fTab','cTab']) fEl(t).tBodies[0].onclick=e=>{ if (e.target.closest('a')) return; const tr=e.target.closest('tr.fr'); if (tr) gotoXY(+tr.dataset.x, +tr.dataset.y); };
+// the last village clicked (row or Travian link) stays highlighted in every table, remembered per browser
+function markRow(tr){
+  lastRow=tr.dataset.x+'|'+tr.dataset.y; try{ localStorage.setItem(LAST_KEY, lastRow); }catch(_){}
+  document.querySelectorAll('.ftab tr.fr').forEach(r=>r.classList.toggle('last', r.dataset.x+'|'+r.dataset.y===lastRow));
+}
+for (const t of ['fTab','cTab','mTab']){
+  const tb=fEl(t).tBodies[0];
+  tb.onclick=e=>{ const tr=e.target.closest('tr.fr'); if (!tr) return; markRow(tr); if (!e.target.closest('a')) gotoXY(+tr.dataset.x, +tr.dataset.y); };
+  tb.addEventListener('auxclick', e=>{ const tr=e.target.closest('tr.fr'); if (tr && e.target.closest('a')) markRow(tr); });
+}
 fEl('fCopy').onclick=async e=>{
   const L=[FCOLS.map(c=>c.t).join('\t'), ...fRowsCache.map(r=>FCOLS.map(c=>c.txt?c.txt(r):r[c.k]).join('\t'))].join('\n');
   const btn=e.currentTarget, old=btn.textContent;
