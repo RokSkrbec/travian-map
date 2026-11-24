@@ -334,7 +334,7 @@
       <div class="fctl">
         <label>From <input type="text" id="fFrom" placeholder="x|y" title="Your village's coordinates, for distances"></label>
         <label>No growth for <select id="fIdle"><option value="1">1+ day</option><option value="2">2+ days</option><option value="3">3+ days</option><option value="4">4+ days</option><option value="5">5+ days</option><option value="7">7+ days</option></select></label>
-        <label>Judged by <select id="fJudge" title="Player: the player's total population across all villages. Village: just that village."><option value="player">player's total pop</option><option value="village">village pop</option></select></label>
+        <label>Judged by <select id="fJudge" title="Player: the player counts as growing when any of their villages grew, or they founded or conquered a village (losses from catapults or conquest don't hide that). Village: just that village's population."><option value="player">player (any village grew)</option><option value="village">village pop</option></select></label>
         <label>Max distance <input type="number" id="fDist" min="0" step="5" placeholder="any"></label>
         <label>Village pop <input type="number" id="fMin" min="0" step="50" placeholder="min"> – <input type="number" id="fMax" min="0" step="50" placeholder="max"></label>
         <label>Alliances <select id="fAlly"><option value="nofriend">all except friendly (plans)</option><option value="all">all</option><option value="none">players without alliance</option><option value="enemy">enemy alliances (plans)</option></select></label>
@@ -1257,7 +1257,11 @@ function idleOf(s){
 }
 const plIdle=new Map(), plInfo=new Map();
 for (const v of V){ let p=plInfo.get(v[11]); if(!p){ p={n:0,pop:0}; plInfo.set(v[11],p); } p.n++; p.pop+=v[7]; }
-for (const uid of plInfo.keys()) plIdle.set(uid, idleOf(H.pp[uid]));
+// A player counts as growing on a day when any of their villages grew, or they founded or conquered one
+// (H.pg, worked out by the build from every snapshot). Not by total population: catapult and conquest
+// losses would hide growth elsewhere.
+for (const uid of plInfo.keys()){ const pp=H.pp[uid], g=H.pg?.[uid]; if (!pp){ plIdle.set(uid, idleOf(null)); continue; }
+  let c=0; plIdle.set(uid, idleOf(pp.map((x,k)=>x<0 ? -1 : (c+=(g && g[k]==='1' && k>0)?1:0)))); }
 const regionAt=(x,y)=>{ const r=grid[(200-y)*N+(x-MIN)]; return r>=0?names[r]:''; };
 // one column per snapshot day: that day's village population, with the change from the day before in ()
 const dDelta=(s,k)=>s && k>0 && s[k]>=0 && s[k-1]>=0 ? s[k]-s[k-1] : null;

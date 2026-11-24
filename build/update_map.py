@@ -84,6 +84,16 @@ def history(today, rows):
         players.append(p)
     vpop = {vid: [d[vid][5] if vid in d else -1 for d in days] for vid in days[-1]}   # matched to villages by id in main()
     ppop = {uid: [p[uid][0] if uid in p else -1 for p in players] for uid in players[-1]}
+    # days each player grew: one of their villages grew (same owner both days), or they founded or conquered one.
+    # Total population isn't used: catapult and conquest losses would hide growth in their other villages.
+    grew = {}
+    for i in range(1, len(days)):
+        a, b = days[i - 1], days[i]
+        for vid, r in b.items():
+            o = a.get(vid)
+            if (o and (o[3] != r[3] or r[5] > o[5])) or (not o and r[3] in players[i - 1]):
+                grew.setdefault(r[3], set()).add(i)
+    pgrow = {uid: ''.join('1' if i in grew.get(uid, ()) else '0' for i in range(len(days))) for uid in players[-1]}
     ev = []                           # [type, day, x, y, village, player, alliance, pop, tribe, extra]
     for i in range(1, len(days)):
         a, b, pa, pb = days[i - 1], days[i], players[i - 1], players[i]
@@ -98,7 +108,7 @@ def history(today, rows):
         for uid, e in pb.items():
             if uid in pa and pa[uid][1] != e[1]:
                 ev.append(['ally', i, 0, 0, '', e[2], e[1], e[0], 0, pa[uid][1]])
-    return {'dates': [d for d, _ in snaps], 'vp': vpop, 'pp': ppop, 'ev': ev}
+    return {'dates': [d for d, _ in snaps], 'vp': vpop, 'pp': ppop, 'pg': pgrow, 'ev': ev}
 
 
 def main():
