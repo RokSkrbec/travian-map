@@ -180,10 +180,12 @@
   .ftab th[data-k] { cursor:pointer; user-select:none; } .ftab th[data-k]:hover { color:var(--text); }
   .ftab th.sorted { color:var(--accent); }
   .ftab tr.fr { cursor:pointer; } .ftab tr.fr:hover td { background:#232831; }
+  .ftab td.cut { max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .ftab tr.fr.last td { background:#2a3a52; } .ftab tr.fr.last td:first-child { box-shadow:inset 3px 0 0 var(--accent); }
   .ftab .tr { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
   .ftab .down { color:#ff8a80; } .ftab .up { color:#7fd99a; }
-  .ftab th.day, .ftab td.day { min-width:84px; } .ftab th.day { font-size:11.5px; }
+  .ftab th.day, .ftab td.day { min-width:62px; }
+  .ftab.stack th.day, .ftab.stack td.day { min-width:44px; } .ftab.stack td.day .ch { display:block; font-size:10.5px; line-height:1.15; } .ftab th.day { font-size:11.5px; }
   .ftab a.tv { color:var(--accent); text-decoration:none; } .ftab a.tv:hover { text-decoration:underline; }
   .tag { font-size:10.5px; border:1px solid #3a414d; border-radius:3px; padding:0 4px; color:var(--muted); margin-left:4px; }
   .tag.new { color:#7fd99a; border-color:#2f6a3f; } .tag.warn { color:#ffb454; border-color:#6b5521; } .tag.bad { color:#ff8a80; border-color:#7a3434; }
@@ -355,6 +357,8 @@
       <div class="fctl">
         <label>List <select id="mList"></select></label>
         <label>Status <select id="mStatus"><option value="">all</option><option value="check">needs a look (growing, new owner, gone, not found)</option><option value="inactive">inactive</option><option value="growing">growing</option><option value="owner">new owner</option><option value="gone">gone</option><option value="notfound">not found</option></select></label>
+        <label>Advice <select id="mAdv"><option value="">all</option><option value="more">more troops</option><option value="fewer">fewer troops</option><option value="empty">empty</option><option value="remove">remove</option><option value="ok">OK</option></select></label>
+        <label title="How much one of your raiding units carries. Read from the paste (the best loot per unit); change it if no raid came back full">Carry/unit <input type="number" id="mCap" min="1" style="width:64px"></label>
         <label><input type="text" id="mQ" class="wide" placeholder="Search…"></label>
       </div>
       <div class="note" id="mSum"></div>
@@ -1263,7 +1267,7 @@ function dayCols(from){ const out=[];
     sv:r=>dDelta(r.s,k)??(r.s&&r.s[k]>=0?0:-1e9),
     txt:r=>r.s&&r.s[k]>=0 ? r.s[k]+(dDelta(r.s,k)!=null?` (${dDelta(r.s,k)>0?'+':''}${dDelta(r.s,k)})`:'') : '',
     f:r=>{ if (!r.s || r.s[k]<0) return ''; const d=dDelta(r.s,k);
-      const ch = d==null ? (k>0?' <span class="tr">(new)</span>':'') : ` <span class="${d<0?'down':d>0?'up':'tr'}">(${d>0?'+':d<0?'−':''}${fmt(Math.abs(d))})</span>`;
+      const ch = d==null ? (k>0?' <span class="tr ch">(new)</span>':'') : ` <span class="ch ${d<0?'down':d>0?'up':'tr'}">(${d>0?'+':d<0?'−':''}${fmt(Math.abs(d))})</span>`;
       return fmt(r.s[k])+ch; }});
   return out; }
 const TRAVIAN='https://rog.x2.europe.travian.com';
@@ -1306,9 +1310,9 @@ const farmCols=()=>[
   {k:'region',t:'Region'}, {k:'player',t:'Player'}, {k:'ally',t:'Alliance'},
   {k:'tribe',t:'Tribe'},
   {k:'pop',t:'Pop',num:1},
-  {k:'idle',t:'No growth',num:1,f:r=>(r.atLeast?'≥ ':'')+r.idle+' d', sv:r=>r.idle+(r.atLeast?.5:0), txt:r=>(r.atLeast?'>=':'')+r.idle},
+  {k:'idle',t:'Idle',title:'Days without population growth',num:1,f:r=>(r.atLeast?'≥ ':'')+r.idle+' d', sv:r=>r.idle+(r.atLeast?.5:0), txt:r=>(r.atLeast?'>=':'')+r.idle},
   ...dayCols(HL-(+fEl('fIdle').value||2)),
-  {k:'pn',t:'Player vill.',num:1}, {k:'ppop',t:'Player pop',num:1},
+  {k:'pn',t:'Vill.',title:"Player's villages",num:1}, {k:'ppop',t:'Pl. pop',title:'Player population',num:1},
 ];
 function farmRows(){
   const from=parseXY(fEl('fFrom').value), N_=+fEl('fIdle').value||2, judge=fEl('fJudge').value;
@@ -1331,9 +1335,13 @@ function farmRows(){
   });
   return out;
 }
+// long names are cut with … (full text on hover) so the tables fit the window
+const CUT=new Set(['vname','player','ally','region','list','fl']);
+// with more than 4 date columns the change goes under the population, so the table still fits
+const stackDays=(id, cols)=>fEl(id).classList.toggle('stack', cols.filter(c=>c.day).length>4);
 function tableHtml(cols, rows, limit){
   const th=cols.map(c=>`<th data-k="${c.k}"${c.title?` title="${esc(c.title)}"`:''} class="${[c.num?'num':'',c.day?'day':'',fSort.k===c.k?'sorted':''].join(' ').trim()}">${c.t}${fSort.k===c.k?(fSort.d>0?' ▲':' ▼'):''}</th>`).join('');
-  const tb=rows.slice(0,limit).map(r=>`<tr${r.xy?` class="fr${r.x+'|'+r.y===lastRow?' last':''}" data-x="${r.x}" data-y="${r.y}"`:''}>`+cols.map(c=>`<td class="${[c.num?'num':'',c.day?'day':''].join(' ').trim()}">${c.f?c.f(r):esc(r[c.k]??'')}</td>`).join('')+'</tr>').join('');
+  const tb=rows.slice(0,limit).map(r=>`<tr${r.xy?` class="fr${r.x+'|'+r.y===lastRow?' last':''}" data-x="${r.x}" data-y="${r.y}"`:''}>`+cols.map(c=>`<td class="${[c.num?'num':'',c.day?'day':'',CUT.has(c.k)?'cut':''].join(' ').trim()}"${CUT.has(c.k)&&r[c.k]?` title="${esc(r[c.k])}"`:''}>${c.f?c.f(r):esc(r[c.k]??'')}</td>`).join('')+'</tr>').join('');
   return [`<tr>${th}</tr>`, tb];
 }
 let fRowsCache=[];
@@ -1345,7 +1353,7 @@ function renderFarmTable(){
   const pl=new Set(rows.map(r=>r.player)).size;
   fEl('fNote').innerHTML=`${fmt(rows.length)} villages of ${fmt(pl)} players`+(HL+1<=N_?` · <span class="warn">only ${HL+1} days of history so far, so nobody can show ${N_}+ days yet</span>`:'')+
     (from?'':' · enter your coordinates in <b>From</b> to sort by distance')+' · click a row to see it on the map';
-  const [h,b]=tableHtml(FCOLS, rows, fLimit); fEl('fTab').tHead.innerHTML=h; fEl('fTab').tBodies[0].innerHTML=b;
+  const [h,b]=tableHtml(FCOLS, rows, fLimit); fEl('fTab').tHead.innerHTML=h; fEl('fTab').tBodies[0].innerHTML=b; stackDays('fTab', FCOLS);
   fEl('fMore').hidden=rows.length<=fLimit; fEl('fMore').textContent=`Show all ${fmt(rows.length)}`;
 }
 const CTYPES={new:'New villages', conq:'Conquered', gone:'Gone', drop:'Pop drops', ally:'Alliance changes'};
@@ -1386,7 +1394,7 @@ function renderChanges(){
   const cols=cType==='drop' ? [...CCOLS.drop, ...dayCols(HL-(+fEl('cSince').value||1))] : CCOLS[cType], save=fSort; fSort=cSort;
   const rows=sortTable(all[cType], cols.map(c=>c.k==='date'?{...c, sv:r=>r.day}:c));
   const [h,b]=tableHtml(cols, rows, cLimit); fSort=save;
-  fEl('cTab').tHead.innerHTML=h; fEl('cTab').tBodies[0].innerHTML=b;
+  fEl('cTab').tHead.innerHTML=h; fEl('cTab').tBodies[0].innerHTML=b; stackDays('cTab', cols);
   fEl('cMore').hidden=rows.length<=cLimit; fEl('cMore').textContent=`Show all ${fmt(rows.length)}`;
 }
 // ---------- my farm lists: pasted from Travian's rally point, kept in this browser only ----------
@@ -1412,7 +1420,14 @@ function parseFarmLists(text){
     if (m && ln.trim()) own.push({name:ln.trim(), x:+m[1], y:+m[2]});
     if (/being raided\s*$/.test(ln)){ cur={name:prev, e:[]}; lists.push(cur); return; }
     const p=ln.split('\t').map(s=>s.trim()).filter(Boolean);
-    if (cur && ln.includes('\t') && p.length===3 && /^\d+$/.test(p[1]) && /^\d+(\.\d+)?$/.test(p[2])) cur.e.push({n:p[0], p:+p[1], d:+p[2]});
+    if (cur && ln.includes('\t') && p.length===3 && /^\d+$/.test(p[1]) && /^\d+(\.\d+)?$/.test(p[2])){
+      // the lines after a target hold its last raid: troops sent, time, loot, and a second total
+      const e={n:p[0], p:+p[1], d:+p[2]}, nums=[];
+      for (let j=i+1;j<lines.length && j<=i+6;j++){ const t=lines[j].trim(); if (lines[j].includes('\t') || /being raided\s*$/.test(t)) break;
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(t)) e.t=t; else if (/^[\d,.]+$/.test(t)) nums.push(+t.replace(/[,.]/g,'')); }
+      if (nums.length>=2){ e.tr=nums[0]; e.a=nums[1]; if (nums.length>2) e.b=nums[2]; }
+      cur.e.push(e);
+    }
     if (ln.trim()) prev=ln.trim();
   });
   const from=parseXY(fEl('fFrom').value), srcs=own.length?own:(from?[{name:'From', ...from}]:[]);
@@ -1422,7 +1437,9 @@ function parseFarmLists(text){
     L.src=best?best.s:null;
     L.e=L.e.map(e=>{ const m=L.src&&matchEntry(e,L.src); return m?{...e, x:m.v[0], y:m.v[1], u:m.v[11], how:m.how}:e; });
   }
-  return {at:new Date().toISOString(), own:own.length, lists};
+  // carry per unit: the best loot per unit in the paste (a full raid)
+  let cap=0; for (const L of lists) for (const e of L.e) if (e.tr) cap=Math.max(cap, e.a/e.tr);
+  return {at:new Date().toISOString(), own:own.length, lists, cap:Math.round(cap)||0};
 }
 const flAt=new Map();                    // "x|y" -> [list names]
 function indexLists(){ flAt.clear(); for (const L of myLists?.lists||[]) for (const e of L.e) if (e.x!=null){ const k=e.x+'|'+e.y, a=flAt.get(k)||[]; if (!a.includes(L.name)) a.push(L.name); flAt.set(k,a); } }
@@ -1430,9 +1447,24 @@ indexLists();
 const ST={inactive:['Inactive','new','The player (or village, depending on "Judged by") has not grown for the selected number of days'], growing:['Growing','warn','Grew within the selected number of days: probably active again'],
   owner:['New owner','bad','Someone else owns this village since you pasted the list (conquered)'], gone:['Gone','bad','No longer on the map'],
   natars:['Natars','','Natars village'], notfound:['Not found','','No village with this name at this distance; it may be an oasis, or renamed and resized']};
+// raid advice from the last raid: full bags -> more troops, under 30% -> fewer, nothing -> check or remove
+const ADV={more:['More','new','Came back full: the farm had more. Send more troops or raid it more often'],
+  fewer:['Fewer','warn','Came back under 30% full: send fewer troops or raid it less often'],
+  empty:['Empty','bad','Came back with nothing: someone else farms it, it is empty, or the troops died. Check the report or remove it'],
+  remove:['Remove','bad','The village is gone or has a new owner'], ok:['OK','','30–95% full']};
+const carry=()=>+fEl('mCap').value||myLists?.cap||0;
+function raidOf(e, st){
+  if (st==='owner'||st==='gone') return {u:e.tr, a:e.a, t:e.t, fill:null, adv:'remove', sug:0};
+  const c=carry(); if (!e.tr || !c) return {fill:null, adv:'', sug:null};
+  const fill=e.a/(e.tr*c);
+  const adv = !e.a ? 'empty' : fill>=.95 ? 'more' : fill<.3 ? 'fewer' : 'ok';
+  const sug = adv==='more' ? Math.ceil(e.tr*1.5) : adv==='fewer' ? Math.max(1, Math.ceil(e.a*1.25/c)) : adv==='empty' ? 0 : e.tr;
+  return {u:e.tr, a:e.a, t:e.t, fill, adv, sug};
+}
+const advTag=k=>k?`<span class="tag ${ADV[k][1]}" title="${esc(ADV[k][2])}">${ADV[k][0]}</span>`:'';
 const stTag=k=>`<span class="tag ${ST[k][1]}" title="${esc(ST[k][2])}">${ST[k][0]}</span>`;
 function myFarmRows(){
-  const N_=+fEl('fIdle').value||2, judge=fEl('fJudge').value, lf=fEl('mList').value, sf=fEl('mStatus').value, q=fEl('mQ').value.trim().toLowerCase(), out=[];
+  const N_=+fEl('fIdle').value||2, judge=fEl('fJudge').value, lf=fEl('mList').value, sf=fEl('mStatus').value, af=fEl('mAdv').value, q=fEl('mQ').value.trim().toLowerCase(), out=[];
   for (const L of myLists?.lists||[]){ if (lf && L.name!==lf) continue;
     for (const e of L.e){
       const v=e.x!=null ? vAt.get((200-e.y)*N+(e.x-MIN)) : null, i=v?V.indexOf(v):-1;
@@ -1441,9 +1473,10 @@ function myFarmRows(){
       else if (v[11]===1 || v[3]===5) st='natars';
       else { id=judge==='village'?idleOf(H.vp[i]):plIdle.get(v[11]); st=id && id.days>=N_ ? 'inactive' : 'growing'; }
       if (sf && st!==sf && !(sf==='check' && ['growing','owner','gone','notfound'].includes(st))) continue;
+      const rd=raidOf(e, st); if (af && rd.adv!==af) continue;
       const p=v?plInfo.get(v[11]):null;
       const r={list:L.name, st, vname:v?v[4]:e.n, x:e.x, y:e.y, xy:e.x!=null?`${e.x}|${e.y}`:'', region:e.x!=null?regionAt(e.x,e.y):'',
-        player:v?v[5]:'', ally:v?v[6]:'', pop:v?v[7]:e.p, dist:e.d, idle:id?id.days:-1, atLeast:id?.atLeast, s:i>=0?H.vp[i]:null, ppop:p?p.pop:0};
+        player:v?v[5]:'', ally:v?v[6]:'', pop:v?v[7]:e.p, dist:e.d, idle:id?id.days:-1, atLeast:id?.atLeast, s:i>=0?H.vp[i]:null, ppop:p?p.pop:0, ...rd};
       if (q && !`${r.vname} ${r.player} ${r.ally} ${r.region} ${r.xy} ${r.list}`.toLowerCase().includes(q)) continue;
       out.push(r);
     } }
@@ -1452,29 +1485,44 @@ function myFarmRows(){
 const myCols=()=>[
   {k:'list',t:'Farm list'}, {k:'st',t:'Status',f:r=>stTag(r.st), sv:r=>Object.keys(ST).indexOf(r.st), txt:r=>ST[r.st][0]},
   {k:'vname',t:'Village',f:r=>esc(r.vname)}, {...xyCol, f:r=>r.xy?xyCol.f(r):''},
-  {k:'region',t:'Region'}, {k:'player',t:'Player'}, {k:'ally',t:'Alliance'},
+  {k:'player',t:'Player'}, {k:'ally',t:'Alliance'},
   {k:'dist',t:'Dist.',num:1,title:"Distance from the farm list's village, as Travian shows it",f:r=>r.dist.toFixed(1)},
   {k:'pop',t:'Pop',num:1},
-  {k:'idle',t:'No growth',num:1,f:r=>r.idle<0?'':(r.atLeast?'≥ ':'')+r.idle+' d', txt:r=>r.idle<0?'':(r.atLeast?'>=':'')+r.idle},
-  ...dayCols(HL-(+fEl('fIdle').value||2)),
-  {k:'ppop',t:'Player pop',num:1,f:r=>r.ppop?fmt(r.ppop):''},
+  {k:'t',t:'Raided',title:'Time of the last raid (server time) when you pasted the list',f:r=>r.t||''},
+  {k:'u',t:'Troops',num:1,f:r=>r.u??'',sv:r=>r.u??-1},
+  {k:'a',t:'Loot',num:1,f:r=>r.a==null?'':fmt(r.a),sv:r=>r.a??-1},
+  {k:'fill',t:'Full',num:1,title:'Loot ÷ (troops × carry per unit)',f:r=>r.fill==null?'':`<span class="${r.fill>=.95?'up':r.fill<.3?'down':''}">${Math.round(100*r.fill)}%</span>`,sv:r=>r.fill??-1,txt:r=>r.fill==null?'':Math.round(100*r.fill)+'%'},
+  {k:'adv',t:'Advice',f:r=>advTag(r.adv),sv:r=>['remove','empty','fewer','more','ok',''].indexOf(r.adv),txt:r=>r.adv?ADV[r.adv][0]:''},
+  {k:'sug',t:'Send',num:1,title:'Suggested troops for the next raid',f:r=>r.sug==null||r.sug===r.u?'':`<b>${r.sug}</b>`,sv:r=>r.sug??-1},
+  {k:'idle',t:'Idle',title:'Days without population growth',num:1,f:r=>r.idle<0?'':(r.atLeast?'≥ ':'')+r.idle+' d', txt:r=>r.idle<0?'':(r.atLeast?'>=':'')+r.idle},
+  ...dayCols(HL-2),                         // last 3 days only: this table is about raids
+  {k:'ppop',t:'Pl. pop',title:'Player population',num:1,f:r=>r.ppop?fmt(r.ppop):''},
 ];
 let mSort={k:'st',d:1}, mLimit=200, mRowsCache=[], mColsCache=[];
+function raidSummary(rows){
+  const R=rows.filter(r=>r.u && r.fill!=null); if (!R.length) return myLists?.lists?.length ? '<br>No raid results in this paste. Paste the Farm List page again (with the lists unfolded) to see loot and advice.' : '';
+  const c=carry(), by=new Map(); for (const r of R){ const g=by.get(r.list)||{u:0,a:0,n:0,full:0,empty:0}; g.u+=r.u; g.a+=r.a; g.n++; if (r.adv==='more') g.full++; if (r.adv==='empty') g.empty++; by.set(r.list,g); }
+  const tot={u:0,a:0}; for (const g of by.values()){ tot.u+=g.u; tot.a+=g.a; }
+  const pct=g=>Math.round(100*g.a/(g.u*c));
+  return `<br>Last raids: <b>${fmt(tot.a)}</b> loot with ${fmt(tot.u)} troops, <b>${pct(tot)}% full</b> (${c} per unit) · `+
+    [...by].map(([n,g])=>`${esc(n)} <b class="${pct(g)<30?'down':''}">${pct(g)}%</b>${g.empty?` <span class="note">${g.empty} empty</span>`:''}`).join(' · ');
+}
 function renderMyFarms(){
   const ls=myLists?.lists||[], sel=fEl('mList'), keep=sel.value;
+  fEl('mCap').placeholder=myLists?.cap||'';
   sel.innerHTML='<option value="">all lists</option>'+ls.map(L=>`<option${L.name===keep?' selected':''}>${esc(L.name)}</option>`).join('');
   if (!ls.length){ fEl('mSum').innerHTML='No farm lists yet. Click <b>Paste farm lists</b>.'; fEl('mPaste').hidden=false;
     fEl('mTab').tHead.innerHTML=''; fEl('mTab').tBodies[0].innerHTML=''; fEl('mMore').hidden=true; return; }
   const cnt={}; let all=0; for (const L of ls) for (const e of L.e) all++;
-  const rowsAll=(()=>{ const a=fEl('mStatus').value, b=fEl('mList').value, c=fEl('mQ').value; fEl('mStatus').value=''; fEl('mList').value=''; fEl('mQ').value='';
-    const r=myFarmRows(); fEl('mStatus').value=a; fEl('mList').value=b; fEl('mQ').value=c; return r; })();
+  const rowsAll=(()=>{ const a=fEl('mStatus').value, b=fEl('mList').value, c=fEl('mQ').value, d=fEl('mAdv').value; fEl('mStatus').value=''; fEl('mList').value=''; fEl('mQ').value=''; fEl('mAdv').value='';
+    const r=myFarmRows(); fEl('mStatus').value=a; fEl('mList').value=b; fEl('mQ').value=c; fEl('mAdv').value=d; return r; })();
   for (const r of rowsAll) cnt[r.st]=(cnt[r.st]||0)+1;
   fEl('mSum').innerHTML=`${ls.length} lists · ${fmt(all)} targets · pasted ${new Date(myLists.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · `+
-    Object.keys(ST).filter(k=>cnt[k]).map(k=>`${stTag(k)} ${cnt[k]}`).join(' &nbsp;');
+    Object.keys(ST).filter(k=>cnt[k]).map(k=>`${stTag(k)} ${cnt[k]}`).join(' &nbsp;')+raidSummary(rowsAll);
   mColsCache=myCols(); const save=fSort; fSort=mSort;
   const rows=sortTable(myFarmRows(), mColsCache); mRowsCache=rows;
   const [h,b]=tableHtml(mColsCache, rows, mLimit); fSort=save;
-  fEl('mTab').tHead.innerHTML=h; fEl('mTab').tBodies[0].innerHTML=b;
+  fEl('mTab').tHead.innerHTML=h; fEl('mTab').tBodies[0].innerHTML=b; stackDays('mTab', mColsCache);
   fEl('mMore').hidden=rows.length<=mLimit; fEl('mMore').textContent=`Show all ${fmt(rows.length)}`;
 }
 fEl('mPasteBtn').onclick=()=>{ fEl('mPaste').hidden=!fEl('mPaste').hidden; if (!fEl('mPaste').hidden) fEl('mText').focus(); };
@@ -1490,7 +1538,8 @@ fEl('mRead').onclick=()=>{
   renderFarms(); syncUrlSoon();
 };
 fEl('mClear').onclick=()=>{ if (!confirm('Forget the pasted farm lists in this browser?')) return; myLists=null; try{ localStorage.removeItem(FL_KEY); }catch(e){} indexLists(); fEl('mMsg').textContent=''; renderFarms(); };
-for (const id of ['mList','mStatus']) fEl(id).addEventListener('change',()=>{ mLimit=200; renderMyFarms(); });
+for (const id of ['mList','mStatus','mAdv']) fEl(id).addEventListener('change',()=>{ mLimit=200; renderMyFarms(); });
+fEl('mCap').addEventListener('input',()=>{ mLimit=200; renderMyFarms(); });
 fEl('mQ').addEventListener('input',()=>{ mLimit=200; renderMyFarms(); });
 fEl('mMore').onclick=()=>{ mLimit=1e9; renderMyFarms(); };
 fEl('mTab').tHead.onclick=e=>{ const k=e.target.closest('th')?.dataset.k; if(!k) return; mSort = mSort.k===k ? {k, d:-mSort.d} : {k, d:['pop','idle','ppop'].includes(k)?-1:1}; renderMyFarms(); };
